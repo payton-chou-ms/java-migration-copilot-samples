@@ -1,0 +1,145 @@
+{
+  "$schema": "../../../../.github/modernize/schema/tasks-schema.json",
+  "description": "Tasks template for modernization plan. Generate this file alongside plan.md to track individual migration tasks.",
+  "tasks": [
+    {
+      "type": "upgrade",
+      "id": "001-upgrade-java-version",
+      "description": "Upgrade Java Version. Addresses issues: Java Version is not the latest LTS.",
+      "reason": "The Maven projects target outdated JDKs (asset-manager on Java 8 / Spring Boot 2.7, todo-web-api on Java 17 / Spring Boot 3.2). Upgrading to the latest LTS provides current language features, performance gains, security fixes, and a longer support lifecycle required for cloud hosting on Azure.",
+      "requirements": "Upgrade the JDK/Java language level of the Maven projects and update each pom.xml accordingly. Target versions: asset-manager/web and asset-manager/worker must be set to Java 17 (Spring Boot 2.7 is incompatible with Java 21; a Spring Boot 3.x upgrade is out of scope); todo-web-api-use-oracle-db, mi-sql-public-demo, and rabbitmq-sender must be set to Java 21. This is a JDK/Java-only upgrade: do not upgrade Spring Boot, Spring Framework, or migrate javax.* to jakarta.*. Ensure each project builds and all existing unit tests pass after the upgrade.",
+      "environmentConfiguration": "Maven build tool with a JDK matching the target Java version.",
+      "kbId": "java-version-upgrade",
+      "dependencies": [],
+      "successCriteria": {
+        "passBuild": "true",
+        "generateNewUnitTests": "false",
+        "passUnitTests": "true"
+      }
+    },
+    {
+      "type": "transform",
+      "id": "002-transform-migration-ant-project-to-maven-project",
+      "description": "Migrate from Ant Project to Maven Project. Addresses issues: Ant build tool found.",
+      "reason": "The jakarta-ee/student-web-app project uses an Ant build (build.xml), which lacks standard conventions and dependency management and is not well suited to modern cloud-native CI/CD. Migrating to Maven enables convention-over-configuration builds, Maven Central dependency management, and better tooling/CI integration.",
+      "requirements": "Convert the Ant-based jakarta-ee/student-web-app project (build.xml) to a Maven project by generating a pom.xml, mapping Ant build targets and library references to Maven dependencies, and restructuring sources to the Maven standard directory layout. Preserve existing application behavior. Ensure the project builds successfully with Maven after conversion.",
+      "environmentConfiguration": "Maven build tool with a compatible JDK.",
+      "kbId": "ant-project-to-maven-project",
+      "dependencies": [],
+      "skills": [
+        {
+          "name": "migration-ant-project-to-maven-project",
+          "location": "builtin"
+        }
+      ],
+      "successCriteria": {
+        "passBuild": "true",
+        "generateNewUnitTests": "false",
+        "passUnitTests": "true"
+      }
+    },
+    {
+      "type": "transform",
+      "id": "003-transform-migrate-local-resource-to-azure",
+      "description": "Migrate the Local Resource to Azure. Addresses issues: Local JDBC Calls, Localhost Usage.",
+      "reason": "The asset-manager web and worker modules connect to a local PostgreSQL database via localhost JDBC (a mandatory cloud-readiness blocker), and other modules reference localhost resources. Local resources are not reachable from Azure-hosted workloads, so the database must be migrated to a managed Azure service with secure, passwordless authentication.",
+      "requirements": "Migrate the local PostgreSQL database accessed via localhost JDBC in asset-manager/web and asset-manager/worker (spring.datasource.url pointing to localhost) to Azure Database for PostgreSQL, and update the datasource configuration to use Azure Managed Identity for passwordless authentication. Remove localhost endpoints from application.properties so the app targets the managed Azure resource. Scope is limited to asset-manager only: the Oracle localhost references in todo-web-api and the Docker Compose / Liberty localhost references in student-web-app are out of scope for this task. Ensure the asset-manager modules build and existing unit tests pass.",
+      "environmentConfiguration": "Azure Database for PostgreSQL endpoint; Managed Identity for authentication; Maven build tool with the upgraded JDK.",
+      "dependencies": ["001-upgrade-java-version"],
+      "skills": [
+        {
+          "name": "migration-mi-postgresql",
+          "location": "builtin"
+        }
+      ],
+      "successCriteria": {
+        "passBuild": "true",
+        "generateNewUnitTests": "false",
+        "passUnitTests": "true"
+      }
+    },
+    {
+      "type": "security",
+      "id": "004-security-resolve-code-quality-cwes",
+      "description": "Scan and resolve Code Quality CWE vulnerabilities. Addresses issues: CWE-477, CWE-772, CWE-775, CWE-1057.",
+      "reason": "The assessment identified code-quality weaknesses that affect maintainability and resource safety: use of obsolete iBATIS 2.x APIs, leaked image/JDBC resources on exceptional paths, and data-access logic bypassing the designated data manager component.",
+      "requirements": "Scan the project and remediate the following CWEs: CWE-477 (Use of Obsolete Function) by replacing the obsolete iBATIS 2.x APIs in jakarta-ee/student-web-app MyBatisUtil and its call sites with maintained equivalents; CWE-772 (Missing Release of Resource) by wrapping the ImageOutputStream instances in asset-manager worker AbstractFileProcessingService.generateThumbnail() in try-with-resources; CWE-775 (Missing Release of File Descriptor/Handle) by closing the ResultSet in todo-web-api OracleSqlDemonstrator.executeRawOracleQuery() via try-with-resources; and CWE-1057 (Data Access Outside Expected Data Manager) by routing the direct SqlMapSession data access in StudentProfileListServlet, IndexServlet, and AddStudentServlet through the StudentService data manager. Ensure affected projects build and existing unit tests pass.",
+      "environmentConfiguration": "Maven build tool with the upgraded JDK.",
+      "dependencies": ["002-transform-migration-ant-project-to-maven-project", "003-transform-migrate-local-resource-to-azure"],
+      "successCriteria": {
+        "passBuild": "true",
+        "generateNewUnitTests": "false",
+        "passUnitTests": "true"
+      }
+    },
+    {
+      "type": "security",
+      "id": "005-security-resolve-credentials-and-secrets-cwes",
+      "description": "Scan and resolve Credentials & Secrets CWE vulnerabilities. Addresses issues: CWE-259, CWE-778, CWE-798.",
+      "reason": "Hard-coded credentials and complete credential sets are committed in asset-manager application.properties, and security-sensitive file operations in S3Controller are not logged, preventing detection or investigation of misuse.",
+      "requirements": "Scan the project and remediate: CWE-259 (Hard-coded Password) and CWE-798 (Hard-coded Credentials) by removing the plaintext RabbitMQ, PostgreSQL, and AWS credentials from asset-manager/web and asset-manager/worker application.properties and replacing them with environment variable references (e.g. spring.datasource.password=${DB_PASSWORD}); and CWE-778 (Insufficient Logging) by adding audit logging to the security-sensitive upload, delete, and retrieve operations in asset-manager/web S3Controller so failures and access events are recorded. Do not log secret values. Azure Key Vault integration is out of scope for this task. Ensure affected projects build and existing unit tests pass.",
+      "environmentConfiguration": "Environment variables for credential injection; Maven build tool with the upgraded JDK.",
+      "dependencies": ["003-transform-migrate-local-resource-to-azure"],
+      "successCriteria": {
+        "passBuild": "true",
+        "generateNewUnitTests": "false",
+        "passUnitTests": "true"
+      }
+    },
+    {
+      "type": "security",
+      "id": "006-security-resolve-file-and-path-cwes",
+      "description": "Scan and resolve File & Path Security CWE vulnerabilities. Addresses issues: CWE-22, CWE-23, CWE-36, CWE-434.",
+      "reason": "The asset-manager file storage layer resolves user-controlled keys against the storage root without validation, enabling path traversal (relative and absolute) and arbitrary file read/delete, and accepts uploads without restricting dangerous file types.",
+      "requirements": "Scan the project and remediate: CWE-22 (Path Traversal), CWE-23 (Relative Path Traversal), and CWE-36 (Absolute Path Traversal) by validating and canonicalizing the user-supplied key in asset-manager/web LocalFileStorageService.getObject()/deleteObject() and the corresponding S3Controller.viewObject()/deleteObject() so resolved paths cannot escape the storage root and absolute paths are rejected; and CWE-434 (Unrestricted Upload of Dangerous File Type) by enforcing an allow-list of permitted extensions/MIME types in S3Controller.uploadObject(), AwsS3Service, and LocalFileStorageService instead of trusting the client-supplied content type. Ensure the asset-manager modules build and existing unit tests pass.",
+      "environmentConfiguration": "Maven build tool with the upgraded JDK.",
+      "dependencies": ["003-transform-migrate-local-resource-to-azure"],
+      "successCriteria": {
+        "passBuild": "true",
+        "generateNewUnitTests": "false",
+        "passUnitTests": "true"
+      }
+    },
+    {
+      "type": "security",
+      "id": "007-security-resolve-injection-cwes",
+      "description": "Scan and resolve Injection Attack CWE vulnerabilities. Addresses issues: CWE-79, CWE-99.",
+      "reason": "Stored data is written into HTML responses without encoding (stored XSS), and user-controlled identifiers are used as resource keys without restriction (resource injection / path traversal).",
+      "requirements": "Scan the project and remediate: CWE-79 (Cross-site Scripting) by HTML-encoding the student fields written to the response in jakarta-ee/student-web-app StudentProfileListServlet.doGet() before rendering; and CWE-99 (Resource Injection) by restricting and validating the user-controlled key used to resolve resources in asset-manager/web LocalFileStorageService.getObject()/deleteObject() (called from S3Controller) so it cannot reference resources outside the intended storage scope. Ensure affected projects build and existing unit tests pass.",
+      "environmentConfiguration": "Maven build tool with the upgraded JDK.",
+      "dependencies": ["002-transform-migration-ant-project-to-maven-project", "003-transform-migrate-local-resource-to-azure"],
+      "successCriteria": {
+        "passBuild": "true",
+        "generateNewUnitTests": "false",
+        "passUnitTests": "true"
+      }
+    },
+    {
+      "type": "security",
+      "id": "008-security-fix-cve-vulnerabilities",
+      "description": "Scan and fix CVE vulnerabilities in project dependencies.",
+      "reason": "The assessment flagged multiple mandatory CVEs in dependencies, including a CRITICAL PostgreSQL JDBC SQL injection (CVE-2024-1597), Spring Boot DevTools timing attack (CVE-2026-40972), pgjdbc DoS (CVE-2026-42198), and jackson-databind polymorphic type validator bypasses (CVE-2026-54512, CVE-2026-54513).",
+      "requirements": "Scan all project dependencies for known CVEs and upgrade vulnerable dependencies to the minimum patched version: org.postgresql:postgresql (asset-manager web/worker), org.springframework.boot:spring-boot-devtools (asset-manager/web, todo-web-api), and com.fasterxml.jackson.core:jackson-databind (asset-manager/worker, rabbitmq-sender), plus any additional CVEs detected during the scan. If a fix requires a major version upgrade, document the affected dependency, current version, target major version, and breaking-change risk. Verify that every affected project builds and all tests pass after remediation.",
+      "environmentConfiguration": "Maven build tool with the upgraded JDK.",
+      "dependencies": ["001-upgrade-java-version", "003-transform-migrate-local-resource-to-azure"],
+      "skills": [
+        {
+          "name": "validate-cves-and-fix",
+          "location": "builtin"
+        }
+      ],
+      "successCriteria": {
+        "passBuild": "true",
+        "generateNewUnitTests": "false",
+        "passUnitTests": "true"
+      }
+    }
+  ],
+  "metadata": {
+    "planName": "Cloud Readiness & Security Modernization",
+    "projectName": "java-migration-copilot-samples",
+    "language": "java",
+    "createdAt": "2026-06-29T13:40:00.000Z",
+    "version": "1.0"
+  }
+}
