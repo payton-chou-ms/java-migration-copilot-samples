@@ -9,21 +9,22 @@ If there is even a 1% chance a skill is relevant, invoke it. Skills override def
 
 ### Key Skills Available
 
-| Skill | When to Use |
-|-------|-------------|
-| `brainstorming` | Before implementing any new feature or making design decisions |
-| `writing-plans` | After brainstorming is approved; creates step-by-step implementation plans |
-| `executing-plans` | To execute an existing implementation plan inline |
-| `subagent-driven-development` | To execute a plan via fresh subagents per task |
-| `systematic-debugging` | Before proposing any bug fix |
-| `test-driven-development` | When implementing features or bug fixes |
-| `verification-before-completion` | Before claiming work is done or tests pass |
-| `requesting-code-review` | After completing implementation |
-| `receiving-code-review` | Before implementing code review feedback |
-| `finishing-a-development-branch` | When implementation is complete and ready to integrate |
-| `using-git-worktrees` | Before starting isolated feature work |
-| `caveman-commit` | When writing commit messages |
-| `karpathy-guidelines` | When writing, reviewing, or refactoring code |
+| Skill | When to Use | Type |
+|-------|-------------|------|
+| `using-superpowers` | Start of every session — bootstraps skill discovery | Bootstrap |
+| `brainstorming` | Before any creative work or new feature | Rigid |
+| `writing-plans` | When there's a spec and a multi-step task | Rigid |
+| `subagent-driven-development` | Execute an implementation plan (recommended) | Rigid |
+| `executing-plans` | Execute a plan without subagents | Rigid |
+| `test-driven-development` | When implementing any feature or bugfix | Rigid |
+| `systematic-debugging` | Any bug or unexpected behavior | Rigid |
+| `verification-before-completion` | Before claiming work is done or tests pass | Rigid |
+| `using-git-worktrees` | Before starting isolated feature work | Rigid |
+| `finishing-a-development-branch` | After all tasks are complete | Rigid |
+| `requesting-code-review` | After completing a task, before merge | Flexible |
+| `receiving-code-review` | After receiving code review feedback | Flexible |
+| `dispatching-parallel-agents` | 2+ independent tasks | Flexible |
+| `writing-skills` | When creating or editing skills | Rigid |
 
 ### Workflow
 
