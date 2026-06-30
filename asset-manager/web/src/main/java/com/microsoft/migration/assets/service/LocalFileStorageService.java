@@ -122,7 +122,10 @@ public class LocalFileStorageService implements StorageService {
             throw new IOException("File does not contain a valid image: " + filename);
         }
         
-        Path targetLocation = rootLocation.resolve(filename);
+        Path targetLocation = rootLocation.resolve(filename).normalize();
+        if (!targetLocation.startsWith(rootLocation)) {
+            throw new IOException("Cannot store file outside storage directory: " + filename);
+        }
         Files.copy(file.getInputStream(), targetLocation, StandardCopyOption.REPLACE_EXISTING);
         logger.info("Stored file: {}", targetLocation);
 
