@@ -1,9 +1,10 @@
 package org.sample.azure.student.coreft;
 
 import org.sample.azure.student.coreft.util.MyBatisUtil;
-import com.ibatis.sqlmap.client.SqlMapSession;
-import org.apache.log4j.Logger;
-import org.codehaus.jackson.map.ObjectMapper;
+import org.apache.ibatis.session.SqlSession;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -15,7 +16,7 @@ import javax.servlet.http.HttpServletResponse;
 
 public class StudentProfileListServlet extends HttpServlet {
 
-    private static final Logger logger = Logger.getLogger(StudentProfileListServlet.class);
+    private static final Logger logger = LoggerFactory.getLogger(StudentProfileListServlet.class);
 
     private final ObjectMapper objectMapper;
 
@@ -34,12 +35,11 @@ public class StudentProfileListServlet extends HttpServlet {
             out.println("<html><head><title>Student Profile List</title></head><body>");
             out.println("<h2>Student Profile List</h2>");
             
-            SqlMapSession session = null;
+            SqlSession session = null;
             try {
-                session = MyBatisUtil.getSqlMapClient().openSession();
+                session = MyBatisUtil.getSqlSessionFactory().openSession();
 
-                @SuppressWarnings("unchecked")
-                List<StudentProfile> students = (List<StudentProfile>) session.queryForList("com.azure.sample.StudentMapper.listStudent");
+                List<StudentProfile> students = session.selectList("com.azure.sample.StudentMapper.listStudent");
                 
                 out.println("<table border='1'><tr><th>ID</th><th>Name</th><th>Email</th><th>Major</th></tr>");
                 for (StudentProfile student : students) {
@@ -53,7 +53,7 @@ public class StudentProfileListServlet extends HttpServlet {
                 out.println(objectMapper.writeValueAsString(students));
                 
             } catch (Exception ex) {
-                logger.error("Error retrieving student list: " + ex.getMessage(), ex);
+                logger.error("Error retrieving student list: {}", ex.getMessage(), ex);
                 out.println("<p>Error: " + ex.getMessage() + "</p>");
                 throw new RuntimeException(ex);
             } finally {
@@ -61,7 +61,7 @@ public class StudentProfileListServlet extends HttpServlet {
                     try {
                         session.close();
                     } catch (Exception e) {
-                        logger.error("Error closing session: " + e.getMessage(), e);
+                        logger.error("Error closing session: {}", e.getMessage(), e);
                     }
                 }
             }
