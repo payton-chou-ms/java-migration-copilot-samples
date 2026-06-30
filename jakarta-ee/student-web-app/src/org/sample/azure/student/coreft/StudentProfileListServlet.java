@@ -23,6 +23,15 @@ public class StudentProfileListServlet extends HttpServlet {
         objectMapper = new ObjectMapper();
     }
 
+    private static String esc(String s) {
+        if (s == null) return "";
+        return s.replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("\"", "&quot;")
+                .replace("'", "&#x27;");
+    }
+
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response) 
             throws ServletException, IOException {
@@ -43,18 +52,18 @@ public class StudentProfileListServlet extends HttpServlet {
                 
                 out.println("<table border='1'><tr><th>ID</th><th>Name</th><th>Email</th><th>Major</th></tr>");
                 for (StudentProfile student : students) {
-                    out.println("<tr><td>" + student.getId() + "</td>" +
-                               "<td>" + student.getName() + "</td>" +
-                               "<td>" + student.getEmail() + "</td>" +
-                               "<td>" + student.getMajor() + "</td></tr>");
+                    out.println("<tr><td>" + esc(String.valueOf(student.getId())) + "</td>" +
+                               "<td>" + esc(student.getName()) + "</td>" +
+                               "<td>" + esc(student.getEmail()) + "</td>" +
+                               "<td>" + esc(student.getMajor()) + "</td></tr>");
                 }
                 out.println("</table>");
                 out.println("<br/><br/><br/>");
-                out.println(objectMapper.writeValueAsString(students));
+                out.println(esc(objectMapper.writeValueAsString(students)));
                 
             } catch (Exception ex) {
                 logger.error("Error retrieving student list: " + ex.getMessage(), ex);
-                out.println("<p>Error: " + ex.getMessage() + "</p>");
+                out.println("<p>Error: " + esc(ex.getMessage()) + "</p>");
                 throw new RuntimeException(ex);
             } finally {
                 if (session != null) {
