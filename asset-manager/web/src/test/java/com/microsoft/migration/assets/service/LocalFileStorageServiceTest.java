@@ -1,0 +1,90 @@
+package com.microsoft.migration.assets.service;
+
+import com.microsoft.migration.assets.model.ImageProcessingMessage;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.test.util.ReflectionTestUtils;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Base64;
+
+import static com.microsoft.migration.assets.config.RabbitConfig.IMAGE_PROCESSING_QUEUE;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
+
+@ExtendWith(MockitoExtension.class)
+class LocalFileStorageServiceTest {
+
+    @Mock
+    private RabbitTemplate rabbitTemplate;
+
+    @TempDir
+    Path tempDir;
+
+    private LocalFileStorageService service;
+
+    @BeforeEach
+    void setUp() throws IOException {
+        service = new LocalFileStorageService(rabbitTemplate);
+        ReflectionTestUtils.setField(service, "storageDirectory", tempDir.toString());
+        service.init();
+    }
+
+    @Test
+    void uploadObjectRejectsExecutableExtension() {
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            "bad.exe",
+            "application/x-msdownload",
+            "bad".getBytes()
+        );
+
+        IOException ex = assertThrows(IOException.class, () -> service.uploadObject(file));
+
+        assertTrue(ex.getMessage().contains("Unsupported file type: bad.exe"));
+    }
+
+    @Test
+    void uploadObjectRejectsUnsupportedMimeType() {
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            "image.png",
+            "text/x-sh",
+            "echo hi".getBytes()
+        );
+
+        IOException ex = assertThrows(IOException.class, () -> service.uploadObject(file));
+
+        assertTrue(ex.getMessage().contains("Unsupported file type: image.png (text/x-sh)"));
+    }
+
+    @Test
+    void uploadObjectAllowsSupportedImageType() throws IOException {
+        // Minimal valid 1x1 white-pixel PNG
+        byte[] pngBytes = Base64.getDecoder().decode(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+        );
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            "photo.PNG",
+            "image/png",
+            pngBytes
+        );
+
+        service.uploadObject(file);
+
+        assertTrue(Files.exists(tempDir.resolve("photo.PNG")));
+        verify(rabbitTemplate).convertAndSend(eq(IMAGE_PROCESSING_QUEUE), any(ImageProcessingMessage.class));
+    }
+}
