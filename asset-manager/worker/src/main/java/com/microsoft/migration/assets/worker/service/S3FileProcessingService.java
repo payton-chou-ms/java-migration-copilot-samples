@@ -4,6 +4,7 @@ import com.azure.storage.blob.BlobContainerClient;
 import com.azure.storage.blob.BlobClient;
 import com.azure.storage.blob.BlobServiceClient;
 import com.azure.storage.blob.models.BlobHttpHeaders;
+import com.microsoft.migration.assets.worker.model.StyleVariation;
 import com.microsoft.migration.assets.worker.repository.ImageMetadataRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -48,6 +49,23 @@ public class S3FileProcessingService extends AbstractFileProcessingService {
                 metadata.setThumbnailUrl(generateUrl(key));
                 imageMetadataRepository.save(metadata);
             });
+    }
+
+    @Override
+    public void uploadStyleImage(Path source, String key, String contentType,
+                                 String originalKey, StyleVariation style) throws Exception {
+        BlobContainerClient containerClient = blobServiceClient.getBlobContainerClient(containerName);
+        BlobClient blobClient = containerClient.getBlobClient(key);
+        blobClient.uploadFromFile(source.toString(), true);
+        blobClient.setHttpHeaders(new BlobHttpHeaders().setContentType(contentType));
+
+        imageMetadataRepository.findAll().stream()
+                .filter(metadata -> metadata.getS3Key().equals(originalKey))
+                .findFirst()
+                .ifPresent(metadata -> {
+                    style.apply(metadata, key, generateUrl(key));
+                    imageMetadataRepository.save(metadata);
+                });
     }
 
     @Override

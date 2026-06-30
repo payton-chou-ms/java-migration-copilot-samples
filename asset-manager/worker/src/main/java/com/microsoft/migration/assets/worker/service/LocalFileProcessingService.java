@@ -1,5 +1,6 @@
 package com.microsoft.migration.assets.worker.service;
 
+import com.microsoft.migration.assets.worker.model.StyleVariation;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
@@ -47,6 +48,15 @@ public class LocalFileProcessingService extends AbstractFileProcessingService {
         Path destinationPath = rootLocation.resolve(key);
         Files.createDirectories(destinationPath.getParent());
         Files.copy(source, destinationPath, StandardCopyOption.REPLACE_EXISTING);
+    }
+
+    @Override
+    public void uploadStyleImage(Path source, String key, String contentType,
+                                 String originalKey, StyleVariation style) throws Exception {
+        Path destinationPath = rootLocation.resolve(key);
+        Files.createDirectories(destinationPath.getParent());
+        Files.copy(source, destinationPath, StandardCopyOption.REPLACE_EXISTING);
+        // Dev/local profile stores files only; metadata is managed by the web app's local service.
     }
 
     @Override
