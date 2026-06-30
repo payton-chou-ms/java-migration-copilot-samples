@@ -1,0 +1,96 @@
+package org.sample.azure.student.coreft;
+
+import org.sample.azure.student.coreft.service.StudentService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+import javax.naming.Context;
+import javax.naming.InitialContext;
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.mail.Message;
+import javax.mail.Session;
+import javax.mail.Transport;
+import javax.mail.internet.InternetAddress;
+import javax.mail.internet.MimeMessage;
+
+public class AddStudentServlet extends HttpServlet {
+
+    private static final Logger logger = LoggerFactory.getLogger(AddStudentServlet.class);
+    private final StudentService studentService = new StudentService();
+
+    @Override
+    protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        logger.info("Displaying add student form");
+        // Forward to the add student form JSP
+        request.getRequestDispatcher("/add_student_profile.jsp").forward(request, response);
+    }
+
+    @Override
+    protected void doPost(HttpServletRequest request, HttpServletResponse response) 
+            throws ServletException, IOException {
+        
+        String name = request.getParameter("name");
+        String email = request.getParameter("email");
+        String major = request.getParameter("major");
+        boolean success = false;
+        String errorMsg = null;
+        
+        try {
+            logger.info("Starting to add student: name={}, email={}, major={}", name, email, major);
+            
+            Map<String, Object> params = new HashMap<>();
+            params.put("name", name);
+            params.put("email", email);
+            params.put("major", major);
+            
+            success = studentService.addStudent(params);
+            if (!success) {
+                errorMsg = "Failed to add student.";
+            }
+            
+        } catch (Exception e) {
+            logger.error("Error adding student: {}", e.getMessage(), e);
+            errorMsg = e.getMessage();
+        }
+        
+        if (success) {
+            logger.info("Student added successfully, sending email to: {}", email);
+            try {
+                sendEmail(email, name);
+            } catch (Exception emailEx) {
+                logger.warn("Student added but failed to send email to {}: {}", email, emailEx.getMessage(), emailEx);
+            }
+        }
+        
+        if (success) {
+            logger.info("Redirecting to HelloServlet after successful add.");
+            response.setContentType("text/html");
+            response.getWriter().write("<h2>Student added successfully!</h2>");
+            response.getWriter().write("<p><a href='studentProfileList'>View All Student Profiles</a></p>");
+            response.getWriter().write("<p><a href='/'>Add Another Student</a></p>");
+        } else {
+            logger.warn("Add student failed: {}", errorMsg);
+            request.setAttribute("errorMsg", errorMsg != null ? errorMsg : "Failed to add student.");
+            request.getRequestDispatcher("/add_student_profile.jsp").forward(request, response);
+        }
+    }
+
+    private void sendEmail(String to, String name) throws Exception {
+        logger.info("Preparing to send email to: {}", to);
+        // Lookup mail session from JNDI (configured in server.xml)
+        Context ctx = new InitialContext();
+        Session session = (Session) ctx.lookup("java:comp/env/mail/StudentMailSession");
+        Message msg = new MimeMessage(session);
+        msg.setRecipients(Message.RecipientType.TO, InternetAddress.parse(to, false));
+        msg.setSubject("Welcome, " + name + "!");
+        msg.setText("Dear " + name + ",\n\nYour student profile has been created successfully.\n\nRegards,\nAdmin");
+        Transport.send(msg);
+        logger.info("Email sent to: {}", to);
+    }
+}

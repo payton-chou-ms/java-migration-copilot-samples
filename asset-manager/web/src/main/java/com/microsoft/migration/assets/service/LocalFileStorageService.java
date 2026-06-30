@@ -11,12 +11,19 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
-import javax.annotation.PostConstruct;
+import jakarta.annotation.PostConstruct;
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
 import java.io.*;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import static com.microsoft.migration.assets.config.RabbitConfig.IMAGE_PROCESSING_QUEUE;
@@ -26,23 +33,27 @@ import static com.microsoft.migration.assets.config.RabbitConfig.IMAGE_PROCESSIN
 public class LocalFileStorageService implements StorageService {
 
     private static final Logger logger = LoggerFactory.getLogger(LocalFileStorageService.class);
-    
+    private static final Set<String> ALLOWED_EXT = Collections.unmodifiableSet(
+            new HashSet<>(Arrays.asList("jpg", "jpeg", "png", "gif", "webp")));
+    private static final Set<String> ALLOWED_MIME = Collections.unmodifiableSet(
+            new HashSet<>(Arrays.asList("image/jpeg", "image/png", "image/gif", "image/webp")));
+
     private final RabbitTemplate rabbitTemplate;
-    
+
     @Value("${local.storage.directory:../storage}")
     private String storageDirectory;
-    
+
     private Path rootLocation;
 
     public LocalFileStorageService(RabbitTemplate rabbitTemplate) {
         this.rabbitTemplate = rabbitTemplate;
     }
-    
+
     @PostConstruct
     public void init() throws IOException {
         rootLocation = Paths.get(storageDirectory).toAbsolutePath().normalize();
         logger.info("Local storage directory: {}", rootLocation);
-        
+
         // Create directory if it doesn't exist
         if (!Files.exists(rootLocation)) {
             Files.createDirectories(rootLocation);
@@ -52,6 +63,7 @@ public class LocalFileStorageService implements StorageService {
 
     @Override
     public List<S3StorageItem> listObjects() {
+        ensureInitialized();
         try {
             return Files.walk(rootLocation, 1)
                 .filter(path -> !path.equals(rootLocation))
@@ -82,16 +94,34 @@ public class LocalFileStorageService implements StorageService {
 
     @Override
     public void uploadObject(MultipartFile file) throws IOException {
+        ensureInitialized();
         if (file.isEmpty()) {
             throw new IOException("Failed to store empty file");
         }
-        
-        String filename = StringUtils.cleanPath(file.getOriginalFilename());
-        if (filename.contains("..")) {
-            throw new IOException("Cannot store file with relative path outside current directory");
+
+        String originalFilename = file.getOriginalFilename();
+        if (originalFilename == null || originalFilename.isEmpty()) {
+            throw new IOException("Failed to store file with no filename");
         }
-        
-        Path targetLocation = rootLocation.resolve(filename);
+        String filename = StringUtils.cleanPath(originalFilename);
+
+        String ext = getExtension(filename).replaceFirst("^\\.", "").toLowerCase(Locale.ROOT);
+        String contentType = file.getContentType();
+        if (!ALLOWED_EXT.contains(ext) ||
+            contentType == null || !ALLOWED_MIME.contains(contentType.toLowerCase(Locale.ROOT))) {
+            throw new IOException("Unsupported file type: " + filename + " (" + contentType + ")");
+        }
+
+        // Validate actual image content to guard against spoofed MIME types / extensions
+        BufferedImage image;
+        try (InputStream imageStream = file.getInputStream()) {
+            image = ImageIO.read(imageStream);
+        }
+        if (image == null) {
+            throw new IOException("File does not contain a valid image: " + filename);
+        }
+
+        Path targetLocation = resolveSafe(filename);
         Files.copy(file.getInputStream(), targetLocation, StandardCopyOption.REPLACE_EXISTING);
         logger.info("Stored file: {}", targetLocation);
 
@@ -105,9 +135,31 @@ public class LocalFileStorageService implements StorageService {
         rabbitTemplate.convertAndSend(IMAGE_PROCESSING_QUEUE, message);
     }
 
+    private Path resolveSafe(String key) throws IOException {
+        if (key == null || key.isBlank()) {
+            throw new IOException("Invalid or unsafe key: " + key);
+        }
+        Path root = rootLocation.toAbsolutePath().normalize();
+        Path keyPath;
+        try {
+            keyPath = Paths.get(key);
+        } catch (InvalidPathException e) {
+            throw new IOException("Invalid or unsafe key: " + key, e);
+        }
+        if (keyPath.isAbsolute()) {
+            throw new IOException("Invalid or unsafe key: " + key);
+        }
+        Path resolved = root.resolve(keyPath).normalize();
+        if (!resolved.startsWith(root)) {
+            throw new IOException("Invalid or unsafe key: " + key);
+        }
+        return resolved;
+    }
+
     @Override
     public InputStream getObject(String key) throws IOException {
-        Path file = rootLocation.resolve(key);
+        ensureInitialized();
+        Path file = resolveSafe(key);
         if (!Files.exists(file)) {
             throw new FileNotFoundException("File not found: " + key);
         }
@@ -116,8 +168,9 @@ public class LocalFileStorageService implements StorageService {
 
     @Override
     public void deleteObject(String key) throws IOException {
+        ensureInitialized();
         // Delete both original and thumbnail if it exists
-        Path file = rootLocation.resolve(key);
+        Path file = resolveSafe(key);
         if (!Files.exists(file)) {
             throw new FileNotFoundException("File not found: " + key);
         }
@@ -126,7 +179,7 @@ public class LocalFileStorageService implements StorageService {
 
         // Try to delete thumbnail if it exists
         try {
-            Path thumbnailFile = rootLocation.resolve(getThumbnailKey(key));
+            Path thumbnailFile = resolveSafe(getThumbnailKey(key));
             if (Files.exists(thumbnailFile)) {
                 Files.delete(thumbnailFile);
                 logger.info("Deleted thumbnail file: {}", thumbnailFile);
@@ -140,5 +193,18 @@ public class LocalFileStorageService implements StorageService {
     @Override
     public String getStorageType() {
         return "local";
+    }
+
+    private void ensureInitialized() {
+        if (rootLocation == null) {
+            throw new IllegalStateException("Local storage service has not been initialized");
+        }
+    }
+    private String getExtension(String filename) {
+        int lastDot = filename.lastIndexOf('.');
+        if (lastDot < 0 || lastDot == filename.length() - 1) {
+            return "";
+        }
+        return filename.substring(lastDot + 1);
     }
 }
