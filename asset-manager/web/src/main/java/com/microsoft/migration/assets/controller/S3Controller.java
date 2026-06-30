@@ -16,6 +16,8 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.InvalidPathException;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.Optional;
 
@@ -76,8 +78,25 @@ public class S3Controller {
         }
     }
 
+    private static boolean isValidKey(String key) {
+        if (key == null || key.trim().isEmpty()) {
+            return false;
+        }
+        if (key.contains("..") || key.contains("/") || key.contains("\\")) {
+            return false;
+        }
+        try {
+            return !Paths.get(key).isAbsolute();
+        } catch (InvalidPathException e) {
+            return false;
+        }
+    }
+
     @GetMapping("/view/{key}")
     public ResponseEntity<InputStreamResource> viewObject(@PathVariable String key) {
+        if (!isValidKey(key)) {
+            return ResponseEntity.badRequest().build();
+        }
         try {
             InputStream inputStream = storageService.getObject(key);
             
@@ -95,6 +114,10 @@ public class S3Controller {
 
     @PostMapping("/delete/{key}")
     public String deleteObject(@PathVariable String key, RedirectAttributes redirectAttributes) {
+        if (!isValidKey(key)) {
+            redirectAttributes.addFlashAttribute("error", "Invalid resource identifier");
+            return "redirect:/";
+        }
         try {
             storageService.deleteObject(key);
             redirectAttributes.addFlashAttribute("success", "File deleted successfully");
