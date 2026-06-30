@@ -17,6 +17,7 @@ import java.nio.file.Path;
 import java.util.Base64;
 
 import static com.microsoft.migration.assets.config.RabbitConfig.IMAGE_PROCESSING_QUEUE;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -41,6 +42,57 @@ class LocalFileStorageServiceTest {
         service.init();
     }
 
+    // Path safety tests
+    @Test
+    void getObjectThrowsForAbsolutePathKey() {
+        IOException ex = assertThrows(IOException.class,
+                () -> service.getObject("/etc/passwd"));
+        assertTrue(ex.getMessage().contains("Invalid or unsafe key"));
+    }
+
+    @Test
+    void deleteObjectThrowsForAbsolutePathKey() {
+        IOException ex = assertThrows(IOException.class,
+                () -> service.deleteObject("/etc/passwd"));
+        assertTrue(ex.getMessage().contains("Invalid or unsafe key"));
+    }
+
+    @Test
+    void getObjectThrowsForDotDotKey() {
+        IOException ex = assertThrows(IOException.class,
+                () -> service.getObject("../secret.txt"));
+        assertTrue(ex.getMessage().contains("Invalid or unsafe key"));
+    }
+
+    @Test
+    void deleteObjectThrowsForDotDotKey() {
+        IOException ex = assertThrows(IOException.class,
+                () -> service.deleteObject("../../etc/shadow"));
+        assertTrue(ex.getMessage().contains("Invalid or unsafe key"));
+    }
+
+    @Test
+    void getObjectThrowsForNullKey() {
+        assertThrows(IOException.class,
+                () -> service.getObject(null));
+    }
+
+    @Test
+    void getObjectThrowsForBlankKey() {
+        assertThrows(IOException.class,
+                () -> service.getObject("   "));
+    }
+
+    @Test
+    void getObjectSucceedsForValidKey() throws IOException {
+        Path testFile = tempDir.resolve("test.jpg");
+        Files.write(testFile, "data".getBytes());
+        try (java.io.InputStream stream = service.getObject("test.jpg")) {
+            assertArrayEquals("data".getBytes(), stream.readAllBytes());
+        }
+    }
+
+    // File upload validation tests
     @Test
     void uploadObjectRejectsExecutableExtension() {
         MockMultipartFile file = new MockMultipartFile(
