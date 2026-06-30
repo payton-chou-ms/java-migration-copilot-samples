@@ -13,8 +13,9 @@ public class MyBatisUtil {
     static {
         try {
             System.out.println("Initializing MyBatisUtil...");
-            Reader reader = Resources.getResourceAsReader("mybatis-config.xml");
-            sqlSessionFactory = new SqlSessionFactoryBuilder().build(reader);
+            try (Reader reader = Resources.getResourceAsReader("mybatis-config.xml")) {
+                sqlSessionFactory = new SqlSessionFactoryBuilder().build(reader);
+            }
             System.out.println("SqlSessionFactory initialized successfully!");
 
         } catch (Exception e) {

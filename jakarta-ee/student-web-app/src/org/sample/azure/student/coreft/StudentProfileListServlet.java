@@ -4,7 +4,6 @@ import org.sample.azure.student.coreft.util.MyBatisUtil;
 import org.apache.ibatis.session.SqlSession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -17,12 +16,6 @@ import javax.servlet.http.HttpServletResponse;
 public class StudentProfileListServlet extends HttpServlet {
 
     private static final Logger logger = LoggerFactory.getLogger(StudentProfileListServlet.class);
-
-    private final ObjectMapper objectMapper;
-
-    public StudentProfileListServlet() {
-        objectMapper = new ObjectMapper();
-    }
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response) 
@@ -50,7 +43,6 @@ public class StudentProfileListServlet extends HttpServlet {
                 }
                 out.println("</table>");
                 out.println("<br/><br/><br/>");
-                out.println(objectMapper.writeValueAsString(students));
                 
             } catch (Exception ex) {
                 logger.error("Error retrieving student list: {}", ex.getMessage(), ex);

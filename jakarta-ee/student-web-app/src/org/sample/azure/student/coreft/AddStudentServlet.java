@@ -55,10 +55,6 @@ public class AddStudentServlet extends HttpServlet {
             session.commit();
             success = true;
             
-            logger.info("Student added successfully, sending email to: {}", email);
-            // Send email notification
-            sendEmail(email, name);
-            
         } catch (Exception e) {
             logger.error("Error adding student: {}", e.getMessage(), e);
             errorMsg = e.getMessage();
@@ -76,6 +72,15 @@ public class AddStudentServlet extends HttpServlet {
                 } catch (Exception e) {
                     logger.error("Error closing session: {}", e.getMessage(), e);
                 }
+            }
+        }
+        
+        if (success) {
+            logger.info("Student added successfully, sending email to: {}", email);
+            try {
+                sendEmail(email, name);
+            } catch (Exception emailEx) {
+                logger.warn("Student added but failed to send email to {}: {}", email, emailEx.getMessage(), emailEx);
             }
         }
         
