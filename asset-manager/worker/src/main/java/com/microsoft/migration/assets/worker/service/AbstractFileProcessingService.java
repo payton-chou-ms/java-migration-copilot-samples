@@ -2,14 +2,14 @@ package com.microsoft.migration.assets.worker.service;
 
 import com.microsoft.migration.assets.worker.model.ImageProcessingMessage;
 import com.microsoft.migration.assets.worker.util.StorageUtil;
-import com.azure.identity.DefaultAzureCredentialBuilder;
-import com.azure.messaging.servicebus.ServiceBusClientBuilder;
+import com.azure.messaging.servicebus.ServiceBusErrorContext;
 import com.azure.messaging.servicebus.ServiceBusProcessorClient;
 import com.azure.messaging.servicebus.ServiceBusReceivedMessageContext;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.SmartLifecycle;
+import org.springframework.context.annotation.Lazy;
 import lombok.extern.slf4j.Slf4j;
 
 import javax.imageio.IIOImage;
@@ -24,40 +24,36 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-import static com.microsoft.migration.assets.worker.config.ServiceBusConfig.IMAGE_PROCESSING_QUEUE;
-
 @Slf4j
 public abstract class AbstractFileProcessingService implements FileProcessor, SmartLifecycle {
-
-    @Value("${spring.cloud.azure.servicebus.namespace}")
-    private String namespace;
 
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Lazy
+    @Autowired
     private ServiceBusProcessorClient processorClient;
+
     private volatile boolean running = false;
+
+    public void processMessage(ServiceBusReceivedMessageContext context) {
+        try {
+            ImageProcessingMessage message = objectMapper.readValue(
+                    context.getMessage().getBody().toString(),
+                    ImageProcessingMessage.class);
+            processImage(message, context);
+        } catch (JsonProcessingException e) {
+            log.error("Failed to deserialize message — sending to dead letter", e);
+            context.deadLetter();
+        }
+    }
+
+    public void processError(ServiceBusErrorContext context) {
+        log.error("Service Bus processing error", context.getException());
+    }
 
     @Override
     public void start() {
-        processorClient = new ServiceBusClientBuilder()
-                .fullyQualifiedNamespace(namespace + ".servicebus.windows.net")
-                .credential(new DefaultAzureCredentialBuilder().build())
-                .processor()
-                .queueName(IMAGE_PROCESSING_QUEUE)
-                .processMessage(context -> {
-                    try {
-                        ImageProcessingMessage message = objectMapper.readValue(
-                                context.getMessage().getBody().toString(),
-                                ImageProcessingMessage.class);
-                        processImage(message, context);
-                    } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
-                        log.error("Failed to deserialize Service Bus message", e);
-                        context.deadLetter();
-                    }
-                })
-                .processError(context -> log.error("Service Bus processing error", context.getException()))
-                .buildProcessorClient();
         processorClient.start();
         running = true;
     }
@@ -130,9 +126,9 @@ public abstract class AbstractFileProcessingService implements FileProcessor, Sm
                     context.complete();
                     log.debug("Message acknowledged for: {}", message.getKey());
                 } else {
-                    // Send to dead letter (no retry) for failed processing
-                    context.deadLetter();
-                    log.debug("Message sent to dead letter for: {}", message.getKey());
+                    // Abandon for transient failures so message retries up to maxDeliveryCount
+                    context.abandon();
+                    log.debug("Message abandoned for retry: {}", message.getKey());
                 }
             } catch (Exception e) {
                 log.error("Error handling Service Bus acknowledgment for: {}", message.getKey(), e);
