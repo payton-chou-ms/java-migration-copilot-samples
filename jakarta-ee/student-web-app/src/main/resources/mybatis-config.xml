@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE configuration
+        PUBLIC "-//mybatis.org//DTD Config 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-config.dtd">
+<configuration>
+
+    <environments default="production">
+        <environment id="production">
+            <transactionManager type="JDBC"/>
+            <dataSource type="JNDI">
+                <property name="data_source" value="java:comp/env/jdbc/StudentDB"/>
+            </dataSource>
+        </environment>
+    </environments>
+
+    <mappers>
+        <mapper resource="org/sample/azure/student/msfaa/shared/persistence/xml/Student_SqlMap.xml"/>
+    </mappers>
+
+</configuration>

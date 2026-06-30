@@ -102,9 +102,6 @@ public class LocalFileStorageService implements StorageService {
             throw new IOException("Failed to store file with no filename");
         }
         String filename = StringUtils.cleanPath(originalFilename);
-        if (filename.contains("..")) {
-            throw new IOException("Cannot store file with relative path outside current directory");
-        }
 
         String ext = getExtension(filename).replaceFirst("^\\.", "").toLowerCase(Locale.ROOT);
         String contentType = file.getContentType();
@@ -122,10 +119,7 @@ public class LocalFileStorageService implements StorageService {
             throw new IOException("File does not contain a valid image: " + filename);
         }
         
-        Path targetLocation = rootLocation.resolve(filename).normalize();
-        if (!targetLocation.startsWith(rootLocation)) {
-            throw new IOException("Cannot store file outside storage directory: " + filename);
-        }
+        Path targetLocation = resolveSafe(filename);
         Files.copy(file.getInputStream(), targetLocation, StandardCopyOption.REPLACE_EXISTING);
         logger.info("Stored file: {}", targetLocation);
 
@@ -139,9 +133,30 @@ public class LocalFileStorageService implements StorageService {
         rabbitTemplate.convertAndSend(IMAGE_PROCESSING_QUEUE, message);
     }
 
+    private Path resolveSafe(String key) throws IOException {
+        if (key == null || key.isBlank()) {
+            throw new IOException("Invalid or unsafe key: " + key);
+        }
+        Path root = rootLocation.toAbsolutePath().normalize();
+        Path keyPath;
+        try {
+            keyPath = Paths.get(key);
+        } catch (InvalidPathException e) {
+            throw new IOException("Invalid or unsafe key: " + key, e);
+        }
+        if (keyPath.isAbsolute()) {
+            throw new IOException("Invalid or unsafe key: " + key);
+        }
+        Path resolved = root.resolve(keyPath).normalize();
+        if (!resolved.startsWith(root)) {
+            throw new IOException("Invalid or unsafe key: " + key);
+        }
+        return resolved;
+    }
+
     @Override
     public InputStream getObject(String key) throws IOException {
-        Path file = rootLocation.resolve(key);
+        Path file = resolveSafe(key);
         if (!Files.exists(file)) {
             throw new FileNotFoundException("File not found: " + key);
         }
@@ -151,7 +166,7 @@ public class LocalFileStorageService implements StorageService {
     @Override
     public void deleteObject(String key) throws IOException {
         // Delete both original and thumbnail if it exists
-        Path file = rootLocation.resolve(key);
+        Path file = resolveSafe(key);
         if (!Files.exists(file)) {
             throw new FileNotFoundException("File not found: " + key);
         }
@@ -160,7 +175,7 @@ public class LocalFileStorageService implements StorageService {
 
         // Try to delete thumbnail if it exists
         try {
-            Path thumbnailFile = rootLocation.resolve(getThumbnailKey(key));
+            Path thumbnailFile = resolveSafe(getThumbnailKey(key));
             if (Files.exists(thumbnailFile)) {
                 Files.delete(thumbnailFile);
                 logger.info("Deleted thumbnail file: {}", thumbnailFile);
@@ -174,6 +189,21 @@ public class LocalFileStorageService implements StorageService {
     @Override
     public String getStorageType() {
         return "local";
+    }
+
+    private Path resolveSafe(String key) throws IOException {
+        if (key == null || key.trim().isEmpty()) {
+            throw new IOException("Invalid or unsafe key: " + key);
+        }
+        Path normalizedKeyPath = Paths.get(key).normalize();
+        if (normalizedKeyPath.isAbsolute() || normalizedKeyPath.startsWith("..")) {
+            throw new IOException("Invalid or unsafe key: " + key);
+        }
+        Path resolved = rootLocation.resolve(normalizedKeyPath).normalize();
+        if (!resolved.startsWith(rootLocation.normalize())) {
+            throw new IOException("Path traversal attempt detected: " + key);
+        }
+        return resolved;
     }
 
     private String getExtension(String filename) {
