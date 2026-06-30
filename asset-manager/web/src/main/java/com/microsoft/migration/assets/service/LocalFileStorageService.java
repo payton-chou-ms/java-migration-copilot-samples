@@ -143,10 +143,14 @@ public class LocalFileStorageService implements StorageService {
     }
 
     private Path resolveSafe(String key) throws IOException {
-        if (key == null || key.isBlank() || key.contains("..")) {
+        if (key == null || key.trim().isEmpty()) {
             throw new IOException("Invalid or unsafe key: " + key);
         }
-        Path resolved = rootLocation.resolve(key).normalize();
+        Path normalizedKeyPath = Paths.get(key).normalize();
+        if (normalizedKeyPath.isAbsolute() || normalizedKeyPath.startsWith("..")) {
+            throw new IOException("Invalid or unsafe key: " + key);
+        }
+        Path resolved = rootLocation.resolve(normalizedKeyPath).normalize();
         if (!resolved.startsWith(rootLocation.normalize())) {
             throw new IOException("Path traversal attempt detected: " + key);
         }
