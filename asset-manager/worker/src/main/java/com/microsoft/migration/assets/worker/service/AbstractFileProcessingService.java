@@ -1,6 +1,7 @@
 package com.microsoft.migration.assets.worker.service;
 
 import com.microsoft.migration.assets.worker.model.ImageProcessingMessage;
+import com.microsoft.migration.assets.worker.model.StyleVariation;
 import com.microsoft.migration.assets.worker.util.StorageUtil;
 import com.azure.messaging.servicebus.ServiceBusErrorContext;
 import com.azure.messaging.servicebus.ServiceBusProcessorClient;
@@ -32,6 +33,9 @@ public abstract class AbstractFileProcessingService implements FileProcessor, Sm
 
     @Autowired
     private ObjectProvider<ServiceBusProcessorClient> processorClientProvider;
+
+    @Autowired
+    private ImageGenerationService imageGenerationService;
 
     private volatile boolean running = false;
 
@@ -96,6 +100,9 @@ public abstract class AbstractFileProcessingService implements FileProcessor, Sm
                 String thumbnailKey = StorageUtil.getThumbnailKey(message.getKey());
                 uploadThumbnail(thumbnailFile, thumbnailKey, message.getContentType());
 
+                // Generate AI style variations (best-effort; failures do not fail the message)
+                generateStyleVariations(message, originalFile);
+
                 log.info("Successfully processed image: {}", message.getKey());
 
                 // Mark processing as successful
@@ -136,6 +143,38 @@ public abstract class AbstractFileProcessingService implements FileProcessor, Sm
         }
     }
     
+    private void generateStyleVariations(ImageProcessingMessage message, Path originalFile) {
+        if (!imageGenerationService.isConfigured()) {
+            log.info("Azure OpenAI not configured; skipping style variations for {}",
+                    message.getKey());
+            return;
+        }
+
+        for (StyleVariation style : StyleVariation.values()) {
+            Path styleFile = null;
+            try {
+                byte[] bytes = imageGenerationService.generateStyledImage(
+                        originalFile, style.getPrompt());
+                String styleKey = style.keyFor(message.getKey());
+                styleFile = Files.createTempFile("style-" + style.getId(), ".png");
+                Files.write(styleFile, bytes);
+                uploadStyleImage(styleFile, styleKey, "image/png", message.getKey(), style);
+                log.info("Generated {} style for {}", style.getId(), message.getKey());
+            } catch (Exception e) {
+                log.error("Failed to generate {} style for {}: {}",
+                        style.getId(), message.getKey(), e.getMessage());
+            } finally {
+                if (styleFile != null) {
+                    try {
+                        Files.deleteIfExists(styleFile);
+                    } catch (IOException ignored) {
+                        // best-effort cleanup
+                    }
+                }
+            }
+        }
+    }
+
     protected abstract String generateUrl(String key);
 
     protected void generateThumbnail(Path input, Path output) throws IOException {
