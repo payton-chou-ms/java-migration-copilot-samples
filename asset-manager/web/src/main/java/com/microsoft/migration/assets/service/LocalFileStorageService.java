@@ -37,23 +37,23 @@ public class LocalFileStorageService implements StorageService {
             new HashSet<>(Arrays.asList("jpg", "jpeg", "png", "gif", "webp")));
     private static final Set<String> ALLOWED_MIME = Collections.unmodifiableSet(
             new HashSet<>(Arrays.asList("image/jpeg", "image/png", "image/gif", "image/webp")));
-    
+
     private final RabbitTemplate rabbitTemplate;
-    
+
     @Value("${local.storage.directory:../storage}")
     private String storageDirectory;
-    
+
     private Path rootLocation;
 
     public LocalFileStorageService(RabbitTemplate rabbitTemplate) {
         this.rabbitTemplate = rabbitTemplate;
     }
-    
+
     @PostConstruct
     public void init() throws IOException {
         rootLocation = Paths.get(storageDirectory).toAbsolutePath().normalize();
         logger.info("Local storage directory: {}", rootLocation);
-        
+
         // Create directory if it doesn't exist
         if (!Files.exists(rootLocation)) {
             Files.createDirectories(rootLocation);
@@ -96,7 +96,7 @@ public class LocalFileStorageService implements StorageService {
         if (file.isEmpty()) {
             throw new IOException("Failed to store empty file");
         }
-        
+
         String originalFilename = file.getOriginalFilename();
         if (originalFilename == null || originalFilename.isEmpty()) {
             throw new IOException("Failed to store file with no filename");
@@ -118,7 +118,7 @@ public class LocalFileStorageService implements StorageService {
         if (image == null) {
             throw new IOException("File does not contain a valid image: " + filename);
         }
-        
+
         Path targetLocation = resolveSafe(filename);
         Files.copy(file.getInputStream(), targetLocation, StandardCopyOption.REPLACE_EXISTING);
         logger.info("Stored file: {}", targetLocation);

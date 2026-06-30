@@ -3,8 +3,8 @@ package com.microsoft.migration.assets.service;
 import com.microsoft.migration.assets.model.ImageProcessingMessage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -18,14 +18,18 @@ import java.util.Base64;
 
 import static com.microsoft.migration.assets.config.RabbitConfig.IMAGE_PROCESSING_QUEUE;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 class LocalFileStorageServiceTest {
+
+    private static final byte[] PNG_BYTES = Base64.getDecoder().decode(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+    );
 
     @Mock
     private RabbitTemplate rabbitTemplate;
@@ -122,16 +126,26 @@ class LocalFileStorageServiceTest {
     }
 
     @Test
-    void uploadObjectAllowsSupportedImageType() throws IOException {
-        // Minimal valid 1x1 white-pixel PNG
-        byte[] pngBytes = Base64.getDecoder().decode(
-            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+    void uploadObjectRejectsAbsolutePathFilename() {
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            tempDir.resolveSibling("outside.png").toString(),
+            "image/png",
+            PNG_BYTES
         );
+
+        IOException ex = assertThrows(IOException.class, () -> service.uploadObject(file));
+
+        assertTrue(ex.getMessage().contains("Invalid or unsafe key"));
+    }
+
+    @Test
+    void uploadObjectAllowsSupportedImageType() throws IOException {
         MockMultipartFile file = new MockMultipartFile(
             "file",
             "photo.PNG",
             "image/png",
-            pngBytes
+            PNG_BYTES
         );
 
         service.uploadObject(file);
