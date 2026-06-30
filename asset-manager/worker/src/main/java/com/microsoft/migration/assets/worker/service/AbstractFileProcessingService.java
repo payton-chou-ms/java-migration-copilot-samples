@@ -8,7 +8,11 @@ import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.support.AmqpHeaders;
 import org.springframework.messaging.handler.annotation.Header;
 
+import javax.imageio.IIOImage;
 import javax.imageio.ImageIO;
+import javax.imageio.ImageWriteParam;
+import javax.imageio.ImageWriter;
+import javax.imageio.stream.ImageOutputStream;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
@@ -138,38 +142,24 @@ public abstract class AbstractFileProcessingService implements FileProcessor {
         // Write the thumbnail with optimized settings for different formats
         if (extension.equalsIgnoreCase("jpg") || extension.equalsIgnoreCase("jpeg")) {
             // For JPEG, we need to set compression quality
-            javax.imageio.ImageWriter jpgWriter = javax.imageio.ImageIO.getImageWritersByFormatName("jpg").next();
-            javax.imageio.ImageWriteParam jpgWriteParam = jpgWriter.getDefaultWriteParam();
-            jpgWriteParam.setCompressionMode(javax.imageio.ImageWriteParam.MODE_EXPLICIT);
+            ImageWriter jpgWriter = ImageIO.getImageWritersByFormatName("jpg").next();
+            ImageWriteParam jpgWriteParam = jpgWriter.getDefaultWriteParam();
+            jpgWriteParam.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
             // Higher compression quality (0.95 for maximum clarity)
             jpgWriteParam.setCompressionQuality(0.95f);
-            
-            javax.imageio.IIOImage outputImage = new javax.imageio.IIOImage(resultImage, null, null);
-            javax.imageio.stream.ImageOutputStream outputStream = 
-                javax.imageio.ImageIO.createImageOutputStream(output.toFile());
-            jpgWriter.setOutput(outputStream);
-            jpgWriter.write(null, outputImage, jpgWriteParam);
-            jpgWriter.dispose();
-            outputStream.close();
+            writeWithWriter(jpgWriter, jpgWriteParam, resultImage, output);
         } else {
             // For PNG, use compression level 0 (no compression) for best quality
-            javax.imageio.ImageWriteParam pngWriteParam = null;
             if (extension.equalsIgnoreCase("png")) {
-                javax.imageio.ImageWriter pngWriter = ImageIO.getImageWritersByFormatName("png").next();
-                pngWriteParam = pngWriter.getDefaultWriteParam();
+                ImageWriter pngWriter = ImageIO.getImageWritersByFormatName("png").next();
+                ImageWriteParam pngWriteParam = pngWriter.getDefaultWriteParam();
                 if (pngWriteParam.canWriteCompressed()) {
-                    pngWriteParam.setCompressionMode(javax.imageio.ImageWriteParam.MODE_EXPLICIT);
+                    pngWriteParam.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
                     pngWriteParam.setCompressionType("Deflate");
                     pngWriteParam.setCompressionQuality(0.0f); // 0 = best quality for PNG
-                    
-                    javax.imageio.IIOImage outputImage = new javax.imageio.IIOImage(resultImage, null, null);
-                    javax.imageio.stream.ImageOutputStream outputStream = 
-                        javax.imageio.ImageIO.createImageOutputStream(output.toFile());
-                    pngWriter.setOutput(outputStream);
-                    pngWriter.write(null, outputImage, pngWriteParam);
-                    pngWriter.dispose();
-                    outputStream.close();
+                    writeWithWriter(pngWriter, pngWriteParam, resultImage, output);
                 } else {
+                    pngWriter.dispose();
                     ImageIO.write(resultImage, extension, output.toFile());
                 }
             } else {
@@ -180,7 +170,17 @@ public abstract class AbstractFileProcessingService implements FileProcessor {
 
         log.info("Successfully generated thumbnail: {}", output);
     }
-    
+
+    private void writeWithWriter(ImageWriter writer, ImageWriteParam param,
+                                  BufferedImage image, Path output) throws IOException {
+        try (ImageOutputStream ios = ImageIO.createImageOutputStream(output.toFile())) {
+            writer.setOutput(ios);
+            writer.write(null, new IIOImage(image, null, null), param);
+        } finally {
+            writer.dispose();
+        }
+    }
+
     /**
      * Performs progressive scaling of the image for better quality.
      * This method gradually scales down the image in multiple steps rather than all at once.
