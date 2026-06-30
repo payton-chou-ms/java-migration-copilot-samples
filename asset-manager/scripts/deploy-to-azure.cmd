@@ -47,6 +47,7 @@ set EnvironmentName=%Prefix%-env
 set AcrName=%Prefix%registry
 set IdentityName=%Prefix%-identity
 set ServiceConnectorName=postgres_connection
+if not defined AZURE_OPENAI_IMAGE_DEPLOYMENT set AZURE_OPENAI_IMAGE_DEPLOYMENT=gpt-image-2
 
 echo ===========================================
 echo Deploying Assets Manager to Azure
@@ -272,6 +273,22 @@ if %ERRORLEVEL% neq 0 (
 )
 echo Service Bus Data Owner role assigned.
 
+if defined AZURE_OPENAI_ACCOUNT_RESOURCE_IDS (
+  echo Assigning Cognitive Services OpenAI User role to managed identity...
+  for %%s in (%AZURE_OPENAI_ACCOUNT_RESOURCE_IDS%) do (
+    cmd /c az role assignment create ^
+      --assignee-object-id !IdentityPrincipalId! ^
+      --assignee-principal-type ServicePrincipal ^
+      --role "Cognitive Services OpenAI User" ^
+      --scope "%%s"
+    if !ERRORLEVEL! neq 0 (
+      echo Failed to assign Cognitive Services OpenAI User role to identity. Exiting.
+      exit /b 1
+    )
+  )
+  echo Cognitive Services OpenAI User role assigned.
+)
+
 rem AcrPull role for accessing ACR
 cmd /c az role assignment create ^
   --assignee-object-id !IdentityPrincipalId! ^
@@ -354,7 +371,9 @@ cmd /c az containerapp create ^
   --max-replicas 3 ^
   --env-vars "AZURE_CLIENT_ID=!IdentityClientId!" ^
               "AZURE_STORAGE_ACCOUNT_NAME=%StorageAccountName%" ^
+              "AZURE_STORAGE_CONTAINER_NAME=%ContainerName%" ^
               "AZURE_STORAGE_BLOB_CONTAINER_NAME=%ContainerName%" ^
+              "SERVICEBUS_NAMESPACE=%ServiceBusNamespace%" ^
               "AZURE_SERVICEBUS_NAMESPACE=%ServiceBusNamespace%"
 if %ERRORLEVEL% neq 0 (
     echo Failed to create Web Container App. Exiting.
@@ -426,8 +445,12 @@ cmd /c az containerapp create ^
   --max-replicas 3 ^
   --env-vars "AZURE_CLIENT_ID=!IdentityClientId!" ^
               "AZURE_STORAGE_ACCOUNT_NAME=%StorageAccountName%" ^
+              "AZURE_STORAGE_CONTAINER_NAME=%ContainerName%" ^
               "AZURE_STORAGE_BLOB_CONTAINER_NAME=%ContainerName%" ^
+              "SERVICEBUS_NAMESPACE=%ServiceBusNamespace%" ^
               "AZURE_SERVICEBUS_NAMESPACE=%ServiceBusNamespace%" ^
+              "AZURE_OPENAI_ENDPOINTS=%AZURE_OPENAI_ENDPOINTS%" ^
+              "AZURE_OPENAI_IMAGE_DEPLOYMENT=%AZURE_OPENAI_IMAGE_DEPLOYMENT%" ^
               "SPRING_DATASOURCE_USERNAME=!SPRING_DATASOURCE_USERNAME!" ^
               "SPRING_DATASOURCE_URL=!SPRING_DATASOURCE_URL!"
 if %ERRORLEVEL% neq 0 (

@@ -6,10 +6,21 @@
         <h1 class="sx-h1">Your Images</h1>
 
         <div class="sx-grid sx-grid-cards" id="imageContainer" th:if="${not #lists.isEmpty(objects)}">
-            <div class="sx-card" th:each="object : ${objects}" th:attr="data-key=${object.key}">
-                <div style="background:var(--canvas-alt)">
+            <div class="sx-card" th:each="object : ${objects}" th:with="stylesReady=${object.realisticKey != null and object.cyberpunkKey != null and object.mangaKey != null}" th:attr="data-key=${object.key},data-styles-ready=${stylesReady}">
+                <div style="background:var(--canvas-alt); position:relative">
                     <img th:src="@{'/storage/view/' + ${object.key}}" alt="Image preview"
                          style="width:100%; height:200px; object-fit:cover;">
+                    <!-- Processing badge -->
+                    <div th:unless="${stylesReady}"
+                         style="position:absolute;top:10px;right:10px;background:rgba(83,58,253,0.92);color:#fff;font-size:12px;font-weight:600;padding:4px 10px;border-radius:20px;display:flex;align-items:center;gap:6px">
+                        <span style="display:inline-block;width:8px;height:8px;background:#fff;border-radius:50%;animation:pulse 1s infinite"></span>
+                        Generating styles…
+                    </div>
+                    <!-- Styles ready badge -->
+                    <div th:if="${stylesReady}"
+                         style="position:absolute;top:10px;right:10px;background:rgba(22,163,74,0.9);color:#fff;font-size:12px;font-weight:600;padding:4px 10px;border-radius:20px">
+                        ✓ 3 styles ready
+                    </div>
                 </div>
                 <div style="padding:16px 18px">
                     <div style="font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis"
@@ -156,9 +167,18 @@
             // Start polling when the page loads
             document.addEventListener('DOMContentLoaded', function() {
                 checkForNewUploads();
-                startNormalPolling();
+                // If any image is still being processed, poll aggressively
+                const hasPending = document.querySelectorAll('[data-styles-ready="false"]').length > 0;
+                if (hasPending) {
+                    startPolling(false);
+                } else {
+                    startNormalPolling();
+                }
             });
         </script>
+        <style>
+            @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+        </style>
     </div>
 </body>
 </html>

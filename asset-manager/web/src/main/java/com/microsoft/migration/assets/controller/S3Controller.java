@@ -32,9 +32,30 @@ public class S3Controller {
 
     @GetMapping
     public String listObjects(Model model) {
-        List<S3StorageItem> objects = storageService.listObjects();
+        List<S3StorageItem> objects = storageService.listObjects().stream()
+                .filter(item -> !isGeneratedArtifactKey(item.getKey()))
+                .toList();
+        objects.forEach(item ->
+            imageMetadataRepository.findFirstByS3Key(item.getKey()).ifPresent(metadata -> {
+                item.setRealisticKey(metadata.getRealisticKey());
+                item.setCyberpunkKey(metadata.getCyberpunkKey());
+                item.setMangaKey(metadata.getMangaKey());
+            })
+        );
         model.addAttribute("objects", objects);
         return "list";
+    }
+
+    private static boolean isGeneratedArtifactKey(String key) {
+        if (key == null) {
+            return false;
+        }
+        int dotIndex = key.lastIndexOf('.');
+        String stem = dotIndex > 0 ? key.substring(0, dotIndex) : key;
+        return stem.endsWith("_thumbnail")
+                || stem.endsWith("_realistic")
+                || stem.endsWith("_cyberpunk")
+                || stem.endsWith("_manga");
     }
 
     @GetMapping("/upload")

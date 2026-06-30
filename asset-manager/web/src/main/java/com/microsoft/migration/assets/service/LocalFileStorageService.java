@@ -78,6 +78,7 @@ public class LocalFileStorageService implements StorageService {
         try {
             return Files.walk(rootLocation, 1)
                 .filter(path -> !path.equals(rootLocation))
+                .filter(path -> !isStyleDerivedKey(path.getFileName().toString()))
                 .map(path -> {
                     try {
                         String filename = path.getFileName().toString();
@@ -101,6 +102,13 @@ public class LocalFileStorageService implements StorageService {
             logger.error("Failed to list files", e);
             return new ArrayList<>();
         }
+    }
+
+    private static boolean isStyleDerivedKey(String key) {
+        if (key == null) return false;
+        int dot = key.lastIndexOf('.');
+        String stem = dot > 0 ? key.substring(0, dot) : key;
+        return stem.endsWith("_realistic") || stem.endsWith("_cyberpunk") || stem.endsWith("_manga");
     }
 
     @Override
@@ -150,7 +158,17 @@ public class LocalFileStorageService implements StorageService {
             } else {
                 logger.info("[dev] Service Bus not configured — creating DB record directly for key: {}", message.getKey());
                 imageMetadataRepository.findFirstByS3Key(filename).ifPresentOrElse(
-                    existing -> logger.debug("[dev] ImageMetadata already exists for key: {}", filename),
+                    existing -> {
+                        // File overwritten — clear style keys so worker reprocesses the new content
+                        existing.setRealisticKey(null);
+                        existing.setRealisticUrl(null);
+                        existing.setCyberpunkKey(null);
+                        existing.setCyberpunkUrl(null);
+                        existing.setMangaKey(null);
+                        existing.setMangaUrl(null);
+                        imageMetadataRepository.save(existing);
+                        logger.info("[dev] Reset style keys for overwritten key: {}", filename);
+                    },
                     () -> {
                         ImageMetadata meta = new ImageMetadata();
                         meta.setId(UUID.randomUUID().toString());

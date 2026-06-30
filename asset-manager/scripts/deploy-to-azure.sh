@@ -42,6 +42,7 @@ EnvironmentName="${Prefix}-env"
 AcrName="${Prefix}registry"
 IdentityName="${Prefix}-identity"
 ServiceConnectorName="postgres_connection"
+AzureOpenAIAccountResourceIds="${AZURE_OPENAI_ACCOUNT_RESOURCE_IDS:-}"
 
 echo "==========================================="
 echo "Deploying Assets Manager to Azure"
@@ -254,6 +255,27 @@ if [ $? -ne 0 ]; then
 fi
 echo "Service Bus Data Owner role assigned."
 
+if [ -n "$AzureOpenAIAccountResourceIds" ]; then
+  echo "Assigning Cognitive Services OpenAI User role to managed identity..."
+  IFS=',' read -ra OpenAIAccountIds <<< "$AzureOpenAIAccountResourceIds"
+  for OpenAIAccountId in "${OpenAIAccountIds[@]}"; do
+    OpenAIAccountId=$(echo "$OpenAIAccountId" | xargs)
+    if [ -z "$OpenAIAccountId" ]; then
+      continue
+    fi
+    az role assignment create \
+      --assignee-object-id "$IdentityPrincipalId" \
+      --assignee-principal-type ServicePrincipal \
+      --role "Cognitive Services OpenAI User" \
+      --scope "$OpenAIAccountId"
+    if [ $? -ne 0 ]; then
+      echo "Failed to assign Cognitive Services OpenAI User role to identity. Exiting."
+      exit 1
+    fi
+  done
+  echo "Cognitive Services OpenAI User role assigned."
+fi
+
 # Assign AcrPull role to the managed identity
 echo "Assigning AcrPull role to managed identity..."
 az role assignment create \
@@ -337,7 +359,9 @@ az containerapp create \
   --max-replicas 3 \
   --env-vars "AZURE_CLIENT_ID=${IdentityClientId}" \
              "AZURE_STORAGE_ACCOUNT_NAME=${StorageAccountName}" \
+             "AZURE_STORAGE_CONTAINER_NAME=${ContainerName}" \
              "AZURE_STORAGE_BLOB_CONTAINER_NAME=${ContainerName}" \
+             "SERVICEBUS_NAMESPACE=${ServiceBusNamespace}" \
              "AZURE_SERVICEBUS_NAMESPACE=${ServiceBusNamespace}"
 if [ $? -ne 0 ]; then
     echo "Failed to create Web Container App. Exiting."
@@ -404,8 +428,12 @@ az containerapp create \
   --max-replicas 3 \
   --env-vars "AZURE_CLIENT_ID=${IdentityClientId}" \
              "AZURE_STORAGE_ACCOUNT_NAME=${StorageAccountName}" \
+             "AZURE_STORAGE_CONTAINER_NAME=${ContainerName}" \
              "AZURE_STORAGE_BLOB_CONTAINER_NAME=${ContainerName}" \
+             "SERVICEBUS_NAMESPACE=${ServiceBusNamespace}" \
              "AZURE_SERVICEBUS_NAMESPACE=${ServiceBusNamespace}" \
+             "AZURE_OPENAI_ENDPOINTS=${AZURE_OPENAI_ENDPOINTS:-}" \
+             "AZURE_OPENAI_IMAGE_DEPLOYMENT=${AZURE_OPENAI_IMAGE_DEPLOYMENT:-gpt-image-2}" \
              "SPRING_DATASOURCE_USERNAME=${SPRING_DATASOURCE_USERNAME}" \
              "SPRING_DATASOURCE_URL=${SPRING_DATASOURCE_URL}"
 if [ $? -ne 0 ]; then
