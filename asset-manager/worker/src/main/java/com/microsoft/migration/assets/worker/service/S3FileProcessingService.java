@@ -59,9 +59,7 @@ public class S3FileProcessingService extends AbstractFileProcessingService {
         blobClient.uploadFromFile(source.toString(), true);
         blobClient.setHttpHeaders(new BlobHttpHeaders().setContentType(contentType));
 
-        imageMetadataRepository.findAll().stream()
-                .filter(metadata -> metadata.getS3Key().equals(originalKey))
-                .findFirst()
+        imageMetadataRepository.findFirstByS3Key(originalKey)
                 .ifPresent(metadata -> {
                     style.apply(metadata, key, generateUrl(key));
                     imageMetadataRepository.save(metadata);

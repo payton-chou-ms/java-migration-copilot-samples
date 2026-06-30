@@ -69,9 +69,7 @@ public class S3Controller {
             
             if (foundObject.isPresent()) {
                 S3StorageItem item = foundObject.get();
-                imageMetadataRepository.findAll().stream()
-                        .filter(metadata -> key.equals(metadata.getS3Key()))
-                        .findFirst()
+                imageMetadataRepository.findFirstByS3Key(key)
                         .ifPresent(metadata -> {
                             item.setRealisticKey(metadata.getRealisticKey());
                             item.setCyberpunkKey(metadata.getCyberpunkKey());

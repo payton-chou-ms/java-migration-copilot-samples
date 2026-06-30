@@ -53,6 +53,12 @@ class AbstractFileProcessingServiceTest {
         }
 
         @Override
+        public void uploadStyleImage(Path source, String key, String contentType,
+                                     String originalKey,
+                                     com.microsoft.migration.assets.worker.model.StyleVariation style) {
+        }
+
+        @Override
         public String getStorageType() {
             return "test";
         }
