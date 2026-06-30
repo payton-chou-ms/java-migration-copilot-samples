@@ -102,9 +102,6 @@ public class LocalFileStorageService implements StorageService {
             throw new IOException("Failed to store file with no filename");
         }
         String filename = StringUtils.cleanPath(originalFilename);
-        if (filename.contains("..")) {
-            throw new IOException("Cannot store file with relative path outside current directory");
-        }
 
         String ext = getExtension(filename).replaceFirst("^\\.", "").toLowerCase(Locale.ROOT);
         String contentType = file.getContentType();
@@ -192,6 +189,21 @@ public class LocalFileStorageService implements StorageService {
     @Override
     public String getStorageType() {
         return "local";
+    }
+
+    private Path resolveSafe(String key) throws IOException {
+        if (key == null || key.trim().isEmpty()) {
+            throw new IOException("Invalid or unsafe key: " + key);
+        }
+        Path normalizedKeyPath = Paths.get(key).normalize();
+        if (normalizedKeyPath.isAbsolute() || normalizedKeyPath.startsWith("..")) {
+            throw new IOException("Invalid or unsafe key: " + key);
+        }
+        Path resolved = rootLocation.resolve(normalizedKeyPath).normalize();
+        if (!resolved.startsWith(rootLocation.normalize())) {
+            throw new IOException("Path traversal attempt detected: " + key);
+        }
+        return resolved;
     }
 
     private String getExtension(String filename) {

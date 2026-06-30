@@ -1,7 +1,8 @@
 package org.sample.azure.student.coreft;
 
 import org.sample.azure.student.coreft.service.StudentService;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -20,7 +21,7 @@ import javax.mail.internet.MimeMessage;
 
 public class AddStudentServlet extends HttpServlet {
 
-    private static final Logger logger = Logger.getLogger(AddStudentServlet.class);
+    private static final Logger logger = LoggerFactory.getLogger(AddStudentServlet.class);
     private final StudentService studentService = new StudentService();
 
     @Override
@@ -41,7 +42,7 @@ public class AddStudentServlet extends HttpServlet {
         String errorMsg = null;
         
         try {
-            logger.info("Starting to add student: name=" + name + ", email=" + email + ", major=" + major);
+            logger.info("Starting to add student: name={}, email={}, major={}", name, email, major);
             
             Map<String, Object> params = new HashMap<>();
             params.put("name", name);
@@ -49,17 +50,22 @@ public class AddStudentServlet extends HttpServlet {
             params.put("major", major);
             
             success = studentService.addStudent(params);
-            if (success) {
-                logger.info("Student added successfully, sending email to: " + email);
-                // Send email notification
-                sendEmail(email, name);
-            } else {
+            if (!success) {
                 errorMsg = "Failed to add student.";
             }
             
         } catch (Exception e) {
-            logger.error("Error adding student: " + e.getMessage(), e);
+            logger.error("Error adding student: {}", e.getMessage(), e);
             errorMsg = e.getMessage();
+        }
+        
+        if (success) {
+            logger.info("Student added successfully, sending email to: {}", email);
+            try {
+                sendEmail(email, name);
+            } catch (Exception emailEx) {
+                logger.warn("Student added but failed to send email to {}: {}", email, emailEx.getMessage(), emailEx);
+            }
         }
         
         if (success) {
@@ -69,14 +75,14 @@ public class AddStudentServlet extends HttpServlet {
             response.getWriter().write("<p><a href='studentProfileList'>View All Student Profiles</a></p>");
             response.getWriter().write("<p><a href='/'>Add Another Student</a></p>");
         } else {
-            logger.warn("Add student failed: " + errorMsg);
+            logger.warn("Add student failed: {}", errorMsg);
             request.setAttribute("errorMsg", errorMsg != null ? errorMsg : "Failed to add student.");
             request.getRequestDispatcher("/add_student_profile.jsp").forward(request, response);
         }
     }
 
     private void sendEmail(String to, String name) throws Exception {
-        logger.info("Preparing to send email to: " + to);
+        logger.info("Preparing to send email to: {}", to);
         // Lookup mail session from JNDI (configured in server.xml)
         Context ctx = new InitialContext();
         Session session = (Session) ctx.lookup("java:comp/env/mail/StudentMailSession");
@@ -85,6 +91,6 @@ public class AddStudentServlet extends HttpServlet {
         msg.setSubject("Welcome, " + name + "!");
         msg.setText("Dear " + name + ",\n\nYour student profile has been created successfully.\n\nRegards,\nAdmin");
         Transport.send(msg);
-        logger.info("Email sent to: " + to);
+        logger.info("Email sent to: {}", to);
     }
 }

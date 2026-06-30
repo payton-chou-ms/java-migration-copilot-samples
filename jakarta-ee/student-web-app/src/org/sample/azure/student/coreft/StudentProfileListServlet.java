@@ -1,8 +1,8 @@
 package org.sample.azure.student.coreft;
 
 import org.sample.azure.student.coreft.service.StudentService;
-import org.apache.log4j.Logger;
-import org.codehaus.jackson.map.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -14,13 +14,10 @@ import javax.servlet.http.HttpServletResponse;
 
 public class StudentProfileListServlet extends HttpServlet {
 
-    private static final Logger logger = Logger.getLogger(StudentProfileListServlet.class);
-
-    private final ObjectMapper objectMapper;
+    private static final Logger logger = LoggerFactory.getLogger(StudentProfileListServlet.class);
     private final StudentService studentService;
 
     public StudentProfileListServlet() {
-        objectMapper = new ObjectMapper();
         studentService = new StudentService();
     }
 
@@ -56,10 +53,9 @@ public class StudentProfileListServlet extends HttpServlet {
                 }
                 out.println("</table>");
                 out.println("<br/><br/><br/>");
-                out.println(esc(objectMapper.writeValueAsString(students)));
                 
             } catch (Exception ex) {
-                logger.error("Error retrieving student list: " + ex.getMessage(), ex);
+                logger.error("Error retrieving student list: {}", ex.getMessage(), ex);
                 response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
                 out.println("<p>Error: Unable to retrieve student list.</p>");
             }
