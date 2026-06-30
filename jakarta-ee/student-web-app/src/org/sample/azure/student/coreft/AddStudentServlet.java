@@ -1,7 +1,6 @@
 package org.sample.azure.student.coreft;
 
-import org.sample.azure.student.coreft.util.MyBatisUtil;
-import org.apache.ibatis.session.SqlSession;
+import org.sample.azure.student.coreft.service.StudentService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -23,6 +22,7 @@ import javax.mail.internet.MimeMessage;
 public class AddStudentServlet extends HttpServlet {
 
     private static final Logger logger = LoggerFactory.getLogger(AddStudentServlet.class);
+    private final StudentService studentService = new StudentService();
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
@@ -40,39 +40,23 @@ public class AddStudentServlet extends HttpServlet {
         String major = request.getParameter("major");
         boolean success = false;
         String errorMsg = null;
-        SqlSession session = null;
         
         try {
             logger.info("Starting to add student: name={}, email={}, major={}", name, email, major);
-            session = MyBatisUtil.getSqlSessionFactory().openSession();
             
             Map<String, Object> params = new HashMap<>();
             params.put("name", name);
             params.put("email", email);
             params.put("major", major);
             
-            session.insert("com.azure.sample.StudentMapper.addStudent", params);
-            session.commit();
-            success = true;
+            success = studentService.addStudent(params);
+            if (!success) {
+                errorMsg = "Failed to add student.";
+            }
             
         } catch (Exception e) {
             logger.error("Error adding student: {}", e.getMessage(), e);
             errorMsg = e.getMessage();
-            if (session != null) {
-                try {
-                    session.rollback();
-                } catch (Exception rollbackEx) {
-                    logger.error("Error rolling back transaction: {}", rollbackEx.getMessage(), rollbackEx);
-                }
-            }
-        } finally {
-            if (session != null) {
-                try {
-                    session.close();
-                } catch (Exception e) {
-                    logger.error("Error closing session: {}", e.getMessage(), e);
-                }
-            }
         }
         
         if (success) {
