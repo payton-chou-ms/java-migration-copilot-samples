@@ -4,8 +4,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.io.InputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -44,8 +46,23 @@ class LocalFileStorageServiceTest {
         Path file = tempDir.resolve("safe.txt");
         Files.write(file, "ok".getBytes(StandardCharsets.UTF_8));
 
-        String content = new String(localFileStorageService.getObject("safe.txt").readAllBytes(), StandardCharsets.UTF_8);
+        String content;
+        try (InputStream inputStream = localFileStorageService.getObject("safe.txt")) {
+            content = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
+        }
 
         assertEquals("ok", content);
+    }
+
+    @Test
+    void uploadObjectRejectsAbsolutePathFilename() {
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            tempDir.resolveSibling("outside.txt").toString(),
+            "text/plain",
+            "blocked".getBytes(StandardCharsets.UTF_8)
+        );
+
+        assertThrows(IOException.class, () -> localFileStorageService.uploadObject(file));
     }
 }

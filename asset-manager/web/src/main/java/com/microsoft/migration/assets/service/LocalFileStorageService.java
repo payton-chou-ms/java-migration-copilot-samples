@@ -91,7 +91,7 @@ public class LocalFileStorageService implements StorageService {
             throw new IOException("Cannot store file with relative path outside current directory");
         }
         
-        Path targetLocation = rootLocation.resolve(filename);
+        Path targetLocation = resolveSafe(filename);
         Files.copy(file.getInputStream(), targetLocation, StandardCopyOption.REPLACE_EXISTING);
         logger.info("Stored file: {}", targetLocation);
 
