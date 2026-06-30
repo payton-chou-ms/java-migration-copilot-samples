@@ -42,7 +42,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
     }
 
     /**
-     * Custom interceptor using HandlerInterceptorAdapter.
+     * Custom interceptor using HandlerInterceptor.
      * This interceptor logs file operations for monitoring and debugging purposes.
      */
     private static class FileOperationLoggingInterceptor implements HandlerInterceptor {
