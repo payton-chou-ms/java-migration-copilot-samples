@@ -63,7 +63,7 @@ public class StudentProfileListServlet extends HttpServlet {
                 
             } catch (Exception ex) {
                 logger.error("Error retrieving student list: " + ex.getMessage(), ex);
-                out.println("<p>Error: " + esc(ex.getMessage()) + "</p>");
+                out.println("<p>Error: Unable to retrieve student list.</p>");
                 throw new RuntimeException(ex);
             } finally {
                 if (session != null) {
