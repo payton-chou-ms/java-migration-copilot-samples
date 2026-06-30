@@ -113,10 +113,10 @@ public abstract class AbstractFileProcessingService implements FileProcessor {
 
         if (originalWidth > originalHeight) {
             thumbnailWidth = maxDimension;
-            thumbnailHeight = (int) (maxDimension / aspectRatio);
+            thumbnailHeight = Math.max(1, (int) Math.round(maxDimension / aspectRatio));
         } else {
             thumbnailHeight = maxDimension;
-            thumbnailWidth = (int) (maxDimension * aspectRatio);
+            thumbnailWidth = Math.max(1, (int) Math.round(maxDimension * aspectRatio));
         }
 
         // Multi-step scaling for higher quality
