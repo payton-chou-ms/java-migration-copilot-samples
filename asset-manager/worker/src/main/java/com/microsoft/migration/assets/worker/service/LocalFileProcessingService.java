@@ -1,14 +1,20 @@
 package com.microsoft.migration.assets.worker.service;
 
+import com.microsoft.migration.assets.worker.model.ImageMetadata;
+import com.microsoft.migration.assets.worker.model.ImageProcessingMessage;
 import com.microsoft.migration.assets.worker.model.StyleVariation;
+import com.microsoft.migration.assets.worker.repository.ImageMetadataRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import jakarta.annotation.PostConstruct;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -17,7 +23,10 @@ import org.slf4j.LoggerFactory;
 public class LocalFileProcessingService extends AbstractFileProcessingService {
     
     private static final Logger logger = LoggerFactory.getLogger(LocalFileProcessingService.class);
-    
+
+    @Autowired
+    private ImageMetadataRepository imageMetadataRepository;
+
     @Value("${local.storage.directory:../storage}")
     private String storageDirectory;
     
@@ -56,7 +65,10 @@ public class LocalFileProcessingService extends AbstractFileProcessingService {
         Path destinationPath = rootLocation.resolve(key);
         Files.createDirectories(destinationPath.getParent());
         Files.copy(source, destinationPath, StandardCopyOption.REPLACE_EXISTING);
-        // Dev/local profile stores files only; metadata is managed by the web app's local service.
+        imageMetadataRepository.findFirstByS3Key(originalKey).ifPresent(metadata -> {
+            style.apply(metadata, key, generateUrl(key));
+            imageMetadataRepository.save(metadata);
+        });
     }
 
     @Override
@@ -66,7 +78,28 @@ public class LocalFileProcessingService extends AbstractFileProcessingService {
 
     @Override
     protected String generateUrl(String key) {
-        // For local storage, we'll just return the relative path
-        return "/storage/" + key;
+        return "/storage/view/" + key;
+    }
+
+    /** Dev-mode: periodically find images that have no style variations yet and generate them. */
+    @Scheduled(fixedDelay = 30_000, initialDelay = 15_000)
+    public void processUnstyledImages() {
+        if (!imageGenerationService.isConfigured()) {
+            return;
+        }
+        List<ImageMetadata> pending = imageMetadataRepository.findByRealisticKeyIsNull();
+        if (pending.isEmpty()) return;
+        logger.info("[dev] Found {} image(s) without style variations", pending.size());
+        for (ImageMetadata meta : pending) {
+            String key = meta.getS3Key();
+            Path originalFile = rootLocation.resolve(key);
+            if (!Files.exists(originalFile)) {
+                logger.warn("[dev] Original file not found, skipping: {}", key);
+                continue;
+            }
+            logger.info("[dev] Generating style variations for: {}", key);
+            ImageProcessingMessage msg = new ImageProcessingMessage(key, "image/png", "local", 0);
+            generateStyleVariations(msg, originalFile);
+        }
     }
 }

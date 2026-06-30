@@ -35,7 +35,7 @@ public abstract class AbstractFileProcessingService implements FileProcessor, Sm
     private ObjectProvider<ServiceBusProcessorClient> processorClientProvider;
 
     @Autowired
-    private ImageGenerationService imageGenerationService;
+    protected ImageGenerationService imageGenerationService;
 
     private volatile boolean running = false;
 
@@ -146,7 +146,7 @@ public abstract class AbstractFileProcessingService implements FileProcessor, Sm
         }
     }
     
-    private void generateStyleVariations(ImageProcessingMessage message, Path originalFile) {
+    protected void generateStyleVariations(ImageProcessingMessage message, Path originalFile) {
         if (!imageGenerationService.isConfigured()) {
             log.info("Azure OpenAI not configured; skipping style variations for {}",
                     message.getKey());

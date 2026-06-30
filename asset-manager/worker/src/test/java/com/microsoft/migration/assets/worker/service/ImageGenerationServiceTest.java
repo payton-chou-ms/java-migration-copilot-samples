@@ -14,9 +14,22 @@ class ImageGenerationServiceTest {
     private ImageGenerationService newService(String endpoint) {
         ImageGenerationService service = new ImageGenerationService(new ObjectMapper());
         service.endpoint = endpoint;
+        service.endpointsConfig = "";
         service.deployment = "gpt-image-2";
         service.apiVersion = "2025-04-01-preview";
         service.size = "1024x1024";
+        service.initEndpoints();
+        return service;
+    }
+
+    private ImageGenerationService newServiceMulti(String endpointsConfig) {
+        ImageGenerationService service = new ImageGenerationService(new ObjectMapper());
+        service.endpoint = "";
+        service.endpointsConfig = endpointsConfig;
+        service.deployment = "gpt-image-2";
+        service.apiVersion = "2025-04-01-preview";
+        service.size = "1024x1024";
+        service.initEndpoints();
         return service;
     }
 
@@ -25,6 +38,13 @@ class ImageGenerationServiceTest {
         assertFalse(newService("").isConfigured());
         assertFalse(newService("   ").isConfigured());
         assertTrue(newService("https://x.openai.azure.com/").isConfigured());
+    }
+
+    @Test
+    void isConfiguredWithMultiEndpoints() {
+        assertFalse(newServiceMulti("").isConfigured());
+        assertTrue(newServiceMulti("https://a.openai.azure.com/|gpt-image-2").isConfigured());
+        assertTrue(newServiceMulti("https://a.openai.azure.com/|gpt-image-2,https://b.openai.azure.com/|gpt-image-2").isConfigured());
     }
 
     @Test

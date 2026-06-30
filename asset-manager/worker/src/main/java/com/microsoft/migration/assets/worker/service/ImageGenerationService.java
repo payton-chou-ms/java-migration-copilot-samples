@@ -6,6 +6,7 @@ import com.azure.identity.DefaultAzureCredential;
 import com.azure.identity.DefaultAzureCredentialBuilder;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -20,7 +21,11 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Collections;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Service
 @Slf4j
@@ -37,6 +42,10 @@ public class ImageGenerationService {
     @Value("${azure.openai.endpoint:}")
     String endpoint;
 
+    /** Multi-endpoint config: "url1|deployment1,url2|deployment2,..." */
+    @Value("${azure.openai.endpoints:}")
+    String endpointsConfig;
+
     @Value("${azure.openai.image-deployment:gpt-image-2}")
     String deployment;
 
@@ -46,13 +55,44 @@ public class ImageGenerationService {
     @Value("${azure.openai.image-size:1024x1024}")
     String size;
 
+    /** Parsed list of [endpoint, deployment] pairs, populated after @Value injection. */
+    private List<String[]> endpointList = Collections.emptyList();
+    private final AtomicInteger roundRobin = new AtomicInteger(0);
+
     public ImageGenerationService(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
     }
 
-    /** True when an Azure OpenAI endpoint is configured. */
+    @PostConstruct
+    void initEndpoints() {
+        List<String[]> list = new ArrayList<>();
+        if (endpointsConfig != null && !endpointsConfig.isBlank()) {
+            for (String entry : endpointsConfig.split(",")) {
+                String trimmed = entry.trim();
+                if (trimmed.contains("|")) {
+                    String[] parts = trimmed.split("\\|", 2);
+                    list.add(new String[]{parts[0].trim(), parts[1].trim()});
+                } else if (!trimmed.isBlank()) {
+                    list.add(new String[]{trimmed, deployment});
+                }
+            }
+        }
+        if (list.isEmpty() && endpoint != null && !endpoint.isBlank()) {
+            list.add(new String[]{endpoint, deployment});
+        }
+        this.endpointList = Collections.unmodifiableList(list);
+        log.info("Azure OpenAI endpoints configured: {}", endpointList.size());
+    }
+
+    /** True when at least one Azure OpenAI endpoint is configured. */
     public boolean isConfigured() {
-        return endpoint != null && !endpoint.isBlank();
+        return !endpointList.isEmpty();
+    }
+
+    /** Pick the next endpoint in round-robin order. */
+    private String[] nextEndpoint() {
+        int idx = Math.abs(roundRobin.getAndIncrement() % endpointList.size());
+        return endpointList.get(idx);
     }
 
     private final DefaultAzureCredential credential = new DefaultAzureCredentialBuilder().build();
@@ -68,13 +108,19 @@ public class ImageGenerationService {
         if (!isConfigured()) {
             throw new IOException("Azure OpenAI endpoint is not configured");
         }
+        String[] ep = nextEndpoint();
+        String epUrl = ep[0];
+        String epDeployment = ep[1];
+
         byte[] imageBytes = Files.readAllBytes(originalImage);
         String boundary = "----asset" + System.currentTimeMillis();
         byte[] body = buildMultipartBody(boundary, imageBytes, prompt);
 
-        String url = endpoint.replaceAll("/+$", "")
-                + "/openai/deployments/" + deployment
+        String url = epUrl.replaceAll("/+$", "")
+                + "/openai/deployments/" + epDeployment
                 + "/images/edits?api-version=" + apiVersion;
+
+        log.debug("Calling gpt-image-2 at {}", url);
 
         AccessToken accessToken = getCredential().getToken(new TokenRequestContext().addScopes(SCOPE)).block();
         if (accessToken == null) {
