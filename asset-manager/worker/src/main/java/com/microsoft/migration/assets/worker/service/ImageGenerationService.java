@@ -1,5 +1,6 @@
 package com.microsoft.migration.assets.worker.service;
 
+import com.azure.core.credential.AccessToken;
 import com.azure.core.credential.TokenRequestContext;
 import com.azure.identity.DefaultAzureCredential;
 import com.azure.identity.DefaultAzureCredentialBuilder;
@@ -54,11 +55,13 @@ public class ImageGenerationService {
         return endpoint != null && !endpoint.isBlank();
     }
 
+    private final DefaultAzureCredential credential = new DefaultAzureCredentialBuilder().build();
+
     /**
      * Call gpt-image-2 /images/edits with the given style prompt and return the PNG bytes.
      */
     DefaultAzureCredential getCredential() {
-        return new DefaultAzureCredentialBuilder().build();
+        return credential;
     }
 
     public byte[] generateStyledImage(Path originalImage, String prompt) throws IOException {
@@ -73,8 +76,11 @@ public class ImageGenerationService {
                 + "/openai/deployments/" + deployment
                 + "/images/edits?api-version=" + apiVersion;
 
-        String token = getCredential().getToken(new TokenRequestContext().addScopes(SCOPE))
-                .block().getToken();
+        AccessToken accessToken = getCredential().getToken(new TokenRequestContext().addScopes(SCOPE)).block();
+        if (accessToken == null) {
+            throw new IOException("Could not acquire Azure credential token");
+        }
+        String token = accessToken.getToken();
 
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
