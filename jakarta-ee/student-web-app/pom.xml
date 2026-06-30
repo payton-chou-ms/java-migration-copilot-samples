@@ -25,7 +25,22 @@
     <spring.version>5.3.39</spring.version>
     <servlet.api.version>4.0.1</servlet.api.version>
     <mysql.connector.version>8.0.33</mysql.connector.version>
+    <!-- CVE-2025-24970 (HIGH): Netty SslHandler DoS fixed in 4.1.118.Final -->
+    <netty.version>4.1.118.Final</netty.version>
   </properties>
+
+  <dependencyManagement>
+    <dependencies>
+      <!-- Pin Netty to minimum patched version for CVE-2025-24970 (CVSS 7.5 HIGH) -->
+      <dependency>
+        <groupId>io.netty</groupId>
+        <artifactId>netty-bom</artifactId>
+        <version>${netty.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
 
   <dependencies>
     <!-- MyBatis 3 (replaces iBATIS 2) -->
