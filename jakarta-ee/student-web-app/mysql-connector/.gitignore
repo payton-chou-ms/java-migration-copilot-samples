@@ -1,0 +1,2 @@
+# Override the root *.jar rule so Liberty shared-lib JARs are committed
+!*.jar

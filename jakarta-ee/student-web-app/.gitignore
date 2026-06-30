@@ -19,9 +19,6 @@ liberty_config/server.env
 # Compile-time dependencies (can be downloaded)
 compile-lib/*.jar
 
-# Docker files
-mysql-connector/
-
 # OS files
 .DS_Store
 Thumbs.db
