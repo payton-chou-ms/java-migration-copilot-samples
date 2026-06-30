@@ -31,7 +31,7 @@ public class ImageGenerationService {
     private final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(20))
             .build();
-    private final DefaultAzureCredential credential = new DefaultAzureCredentialBuilder().build();
+
 
     @Value("${azure.openai.endpoint:}")
     String endpoint;
@@ -57,7 +57,14 @@ public class ImageGenerationService {
     /**
      * Call gpt-image-2 /images/edits with the given style prompt and return the PNG bytes.
      */
-    public byte[] generateStyledImage(Path originalImage, String prompt) throws Exception {
+    DefaultAzureCredential getCredential() {
+        return new DefaultAzureCredentialBuilder().build();
+    }
+
+    public byte[] generateStyledImage(Path originalImage, String prompt) throws IOException {
+        if (!isConfigured()) {
+            throw new IOException("Azure OpenAI endpoint is not configured");
+        }
         byte[] imageBytes = Files.readAllBytes(originalImage);
         String boundary = "----asset" + System.currentTimeMillis();
         byte[] body = buildMultipartBody(boundary, imageBytes, prompt);
@@ -66,7 +73,7 @@ public class ImageGenerationService {
                 + "/openai/deployments/" + deployment
                 + "/images/edits?api-version=" + apiVersion;
 
-        String token = credential.getToken(new TokenRequestContext().addScopes(SCOPE))
+        String token = getCredential().getToken(new TokenRequestContext().addScopes(SCOPE))
                 .block().getToken();
 
         HttpRequest request = HttpRequest.newBuilder()
@@ -77,8 +84,13 @@ public class ImageGenerationService {
                 .POST(HttpRequest.BodyPublishers.ofByteArray(body))
                 .build();
 
-        HttpResponse<String> response =
-                httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> response;
+        try {
+            response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("HTTP request interrupted", e);
+        }
 
         if (response.statusCode() / 100 != 2) {
             throw new IOException("gpt-image-2 returned HTTP " + response.statusCode()
@@ -110,10 +122,12 @@ public class ImageGenerationService {
 
     private void writeTextPart(ByteArrayOutputStream out, String boundary, String name,
                                String value) throws IOException {
+        // Strip CR/LF to prevent multipart boundary injection
+        String safeValue = value.replace("\r", "").replace("\n", " ");
         out.write(("--" + boundary + "\r\n").getBytes(StandardCharsets.UTF_8));
         out.write(("Content-Disposition: form-data; name=\"" + name + "\"\r\n\r\n")
                 .getBytes(StandardCharsets.UTF_8));
-        out.write(value.getBytes(StandardCharsets.UTF_8));
+        out.write(safeValue.getBytes(StandardCharsets.UTF_8));
         out.write("\r\n".getBytes(StandardCharsets.UTF_8));
     }
 
