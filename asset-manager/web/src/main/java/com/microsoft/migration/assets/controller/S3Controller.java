@@ -16,6 +16,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.Optional;
@@ -78,11 +79,17 @@ public class S3Controller {
     }
 
     private static boolean isValidKey(String key) {
-        return key != null && !key.isBlank()
-            && !key.contains("..")
-            && !key.contains("/")
-            && !key.contains("\\")
-            && !Paths.get(key).isAbsolute();
+        if (key == null || key.trim().isEmpty()) {
+            return false;
+        }
+        if (key.contains("..") || key.contains("/") || key.contains("\\")) {
+            return false;
+        }
+        try {
+            return !Paths.get(key).isAbsolute();
+        } catch (InvalidPathException e) {
+            return false;
+        }
     }
 
     @GetMapping("/view/{key}")
