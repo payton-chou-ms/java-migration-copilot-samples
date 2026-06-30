@@ -171,9 +171,12 @@ public abstract class AbstractFileProcessingService implements FileProcessor {
                                  javax.imageio.ImageWriteParam writeParam,
                                  javax.imageio.IIOImage outputImage,
                                  java.io.File destination) throws IOException {
-        try (javax.imageio.stream.ImageOutputStream outputStream =
-                 javax.imageio.ImageIO.createImageOutputStream(destination)) {
-            writer.setOutput(outputStream);
+        javax.imageio.stream.ImageOutputStream outputStream = javax.imageio.ImageIO.createImageOutputStream(destination);
+        if (outputStream == null) {
+            throw new IOException("Unable to create ImageOutputStream for destination: " + destination);
+        }
+        try (javax.imageio.stream.ImageOutputStream stream = outputStream) {
+            writer.setOutput(stream);
             writer.write(null, outputImage, writeParam);
         } finally {
             writer.dispose();
