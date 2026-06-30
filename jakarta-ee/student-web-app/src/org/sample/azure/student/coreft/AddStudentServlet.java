@@ -1,8 +1,8 @@
 package org.sample.azure.student.coreft;
 
-import org.sample.azure.student.coreft.util.MyBatisUtil;
-import com.ibatis.sqlmap.client.SqlMapSession;
-import org.apache.log4j.Logger;
+import org.sample.azure.student.coreft.service.StudentService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -21,7 +21,8 @@ import javax.mail.internet.MimeMessage;
 
 public class AddStudentServlet extends HttpServlet {
 
-    private static final Logger logger = Logger.getLogger(AddStudentServlet.class);
+    private static final Logger logger = LoggerFactory.getLogger(AddStudentServlet.class);
+    private final StudentService studentService = new StudentService();
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
@@ -39,43 +40,31 @@ public class AddStudentServlet extends HttpServlet {
         String major = request.getParameter("major");
         boolean success = false;
         String errorMsg = null;
-        SqlMapSession session = null;
         
         try {
-            logger.info("Starting to add student: name=" + name + ", email=" + email + ", major=" + major);
-            session = MyBatisUtil.getSqlMapClient().openSession();
-            session.startTransaction();
+            logger.info("Starting to add student: name={}, email={}, major={}", name, email, major);
             
             Map<String, Object> params = new HashMap<>();
             params.put("name", name);
             params.put("email", email);
             params.put("major", major);
             
-            session.insert("com.azure.sample.StudentMapper.addStudent", params);
-            session.commitTransaction();
-            success = true;
-            
-            logger.info("Student added successfully, sending email to: " + email);
-            // Send email notification
-            sendEmail(email, name);
+            success = studentService.addStudent(params);
+            if (!success) {
+                errorMsg = "Failed to add student.";
+            }
             
         } catch (Exception e) {
-            logger.error("Error adding student: " + e.getMessage(), e);
+            logger.error("Error adding student: {}", e.getMessage(), e);
             errorMsg = e.getMessage();
-            if (session != null) {
-                try {
-                    session.endTransaction();
-                } catch (Exception rollbackEx) {
-                    logger.error("Error ending transaction: " + rollbackEx.getMessage(), rollbackEx);
-                }
-            }
-        } finally {
-            if (session != null) {
-                try {
-                    session.close();
-                } catch (Exception e) {
-                    logger.error("Error closing session: " + e.getMessage(), e);
-                }
+        }
+        
+        if (success) {
+            logger.info("Student added successfully, sending email to: {}", email);
+            try {
+                sendEmail(email, name);
+            } catch (Exception emailEx) {
+                logger.warn("Student added but failed to send email to {}: {}", email, emailEx.getMessage(), emailEx);
             }
         }
         
@@ -86,14 +75,14 @@ public class AddStudentServlet extends HttpServlet {
             response.getWriter().write("<p><a href='studentProfileList'>View All Student Profiles</a></p>");
             response.getWriter().write("<p><a href='/'>Add Another Student</a></p>");
         } else {
-            logger.warn("Add student failed: " + errorMsg);
+            logger.warn("Add student failed: {}", errorMsg);
             request.setAttribute("errorMsg", errorMsg != null ? errorMsg : "Failed to add student.");
             request.getRequestDispatcher("/add_student_profile.jsp").forward(request, response);
         }
     }
 
     private void sendEmail(String to, String name) throws Exception {
-        logger.info("Preparing to send email to: " + to);
+        logger.info("Preparing to send email to: {}", to);
         // Lookup mail session from JNDI (configured in server.xml)
         Context ctx = new InitialContext();
         Session session = (Session) ctx.lookup("java:comp/env/mail/StudentMailSession");
@@ -102,6 +91,6 @@ public class AddStudentServlet extends HttpServlet {
         msg.setSubject("Welcome, " + name + "!");
         msg.setText("Dear " + name + ",\n\nYour student profile has been created successfully.\n\nRegards,\nAdmin");
         Transport.send(msg);
-        logger.info("Email sent to: " + to);
+        logger.info("Email sent to: {}", to);
     }
 }

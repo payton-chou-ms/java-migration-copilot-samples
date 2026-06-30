@@ -2,7 +2,8 @@ package org.sample.azure.student.coreft.controller;
 
 import org.sample.azure.student.coreft.StudentProfile;
 import org.sample.azure.student.coreft.service.StudentService;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -13,7 +14,7 @@ import java.util.List;
 @Controller
 public class StudentController {
     
-    private static final Logger logger = Logger.getLogger(StudentController.class);
+    private static final Logger logger = LoggerFactory.getLogger(StudentController.class);
     
     @Autowired
     private StudentService studentService;
@@ -25,9 +26,9 @@ public class StudentController {
         try {
             List<StudentProfile> students = studentService.getAllStudents();
             model.addAttribute("students", students);
-            logger.info("Added " + students.size() + " students to model");
+            logger.info("Added {} students to model", students.size());
         } catch (Exception e) {
-            logger.error("Error loading students for index page: " + e.getMessage(), e);
+            logger.error("Error loading students for index page: {}", e.getMessage(), e);
             // Add empty list in case of error
             model.addAttribute("students", List.of());
             model.addAttribute("error", "Unable to load student data: " + e.getMessage());
@@ -43,9 +44,9 @@ public class StudentController {
         try {
             List<StudentProfile> students = studentService.getAllStudents();
             model.addAttribute("students", students);
-            logger.info("Added " + students.size() + " students to model");
+            logger.info("Added {} students to model", students.size());
         } catch (Exception e) {
-            logger.error("Error loading students: " + e.getMessage(), e);
+            logger.error("Error loading students: {}", e.getMessage(), e);
             model.addAttribute("students", List.of());
             model.addAttribute("error", "Unable to load student data: " + e.getMessage());
         }
