@@ -61,21 +61,19 @@ public class TodoService {
         todoRepository.deleteById(id);
     }
 
-    // Demonstrating Oracle-specific SQL with direct JDBC execution
+    // Demonstrating SQL with direct JDBC execution
     @Transactional
     public List<TodoItem> getOverdueTasks() {
         return todoRepository.findOverdue();
     }
 
-    // Another example of Oracle-specific SQL
     @Transactional
-    public void updateTasksWithOracle(LocalDateTime cutoffDate, int newPriority) {
+    public void updateTasksPriority(LocalDateTime cutoffDate, int newPriority) {
         todoRepository.bumpPriorityBefore(cutoffDate, newPriority);
     }
 
-    // Example using Oracle's VARCHAR2 data type specifics in a query
     @Transactional
-    public List<TodoItem> searchWithOracleVarchar2(String searchTerm) {
+    public List<TodoItem> searchByTerm(String searchTerm) {
         return todoRepository.searchVarchar2(searchTerm);
     }
 }

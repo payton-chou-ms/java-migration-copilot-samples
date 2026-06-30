@@ -18,18 +18,18 @@ public interface TodoRepository extends JpaRepository<TodoItem, Long> {
 
     List<TodoItem> findByPriorityGreaterThanEqual(int priority);
 
-    // Oracle specific SQL with VARCHAR2
+    // Full-text search using standard SQL concatenation
     @Query(value = "SELECT * FROM TODO_ITEMS WHERE TITLE LIKE '%' || :keyword || '%' OR DESCRIPTION LIKE '%' || :keyword || '%'",
            nativeQuery = true)
     List<TodoItem> findByKeyword(String keyword);
 
-    // Another Oracle specific query showing off more Oracle SQL features
-    @Query(value = "SELECT * FROM TODO_ITEMS WHERE PRIORITY > :priority AND ROWNUM <= :limit ORDER BY CREATED_AT DESC",
+    // Fetch top priority tasks using PostgreSQL LIMIT
+    @Query(value = "SELECT * FROM TODO_ITEMS WHERE PRIORITY > :priority ORDER BY CREATED_AT DESC LIMIT :limit",
            nativeQuery = true)
     List<TodoItem> findTopPriorityTasks(@Param("priority") int priority, @Param("limit") int limit);
 
     @Query(value = "SELECT * FROM TODO_ITEMS " +
-                   "WHERE DUE_DATE < SYSDATE " +
+                   "WHERE DUE_DATE < CURRENT_TIMESTAMP " +
                    "AND COMPLETED = 0 " +
                    "ORDER BY PRIORITY DESC, DUE_DATE ASC",
            nativeQuery = true)
@@ -38,15 +38,15 @@ public interface TodoRepository extends JpaRepository<TodoItem, Long> {
     @Modifying
     @Query(value = "UPDATE TODO_ITEMS " +
                    "SET PRIORITY = :newPriority, " +
-                   "UPDATED_AT = SYSTIMESTAMP " +
+                   "UPDATED_AT = CURRENT_TIMESTAMP " +
                    "WHERE DUE_DATE < :cutoffDate " +
                    "AND COMPLETED = 0",
            nativeQuery = true)
     int bumpPriorityBefore(@Param("cutoffDate") LocalDateTime cutoffDate, @Param("newPriority") int newPriority);
 
     @Query(value = "SELECT * FROM TODO_ITEMS " +
-                   "WHERE DBMS_LOB.INSTR(TITLE, :searchTerm) > 0 " +
-                   "OR DBMS_LOB.INSTR(DESCRIPTION, :searchTerm) > 0",
+                   "WHERE TITLE ILIKE '%' || :searchTerm || '%' " +
+                   "OR DESCRIPTION ILIKE '%' || :searchTerm || '%'",
            nativeQuery = true)
     List<TodoItem> searchVarchar2(@Param("searchTerm") String searchTerm);
 }

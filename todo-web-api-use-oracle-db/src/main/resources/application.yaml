@@ -1,25 +1,24 @@
 spring:
   datasource:
-    url: ${DATASOURCE_URL:jdbc:oracle:thin:@localhost:1521/XEPDB1}
-    username: ${DB_USER:system}
+    url: ${DATASOURCE_URL:jdbc:postgresql://localhost:5432/todo}
+    username: ${DB_USER:postgres}
     password: ${DB_PASSWORD}
-    driver-class-name: oracle.jdbc.OracleDriver
+    driver-class-name: org.postgresql.Driver
   jpa:
-    database-platform: org.hibernate.dialect.OracleDialect
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
-      ddl-auto: none  # We're using schema.sql for schema definition
-    # show-sql: true
+      ddl-auto: none
     properties:
       hibernate:
         format_sql: true
   sql:
     init:
-      mode: always  # Run schema.sql and data.sql on startup
-      platform: oracle
-      continue-on-error: true  # Set to true to continue despite errors
+      mode: always
+      platform: postgresql
+      continue-on-error: true
       schema-locations: classpath:schema.sql
       data-locations: classpath:data.sql
-      separator: ;  # Use semicolon as separator
+      separator: ;
 
 server:
   port: 8080

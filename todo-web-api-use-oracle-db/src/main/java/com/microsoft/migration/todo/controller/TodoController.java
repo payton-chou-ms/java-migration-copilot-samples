@@ -2,7 +2,7 @@ package com.microsoft.migration.todo.controller;
 
 import com.microsoft.migration.todo.model.TodoItem;
 import com.microsoft.migration.todo.service.TodoService;
-import com.microsoft.migration.todo.util.OracleSqlDemonstrator;
+import com.microsoft.migration.todo.util.PostgreSqlDemonstrator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,7 +25,7 @@ public class TodoController {
     private TodoService todoService;
 
     @Autowired
-    private OracleSqlDemonstrator oracleSqlDemonstrator;
+    private PostgreSqlDemonstrator postgreSqlDemonstrator;
 
     @GetMapping
     public ResponseEntity<List<TodoItem>> getAllTodos() {
@@ -97,32 +97,32 @@ public class TodoController {
     public ResponseEntity<Void> updateTasksPriority(
             @RequestParam LocalDateTime cutoffDate,
             @RequestParam int newPriority) {
-        todoService.updateTasksWithOracle(cutoffDate, newPriority);
+        todoService.updateTasksPriority(cutoffDate, newPriority);
         return ResponseEntity.ok().build();
     }
 
-    @GetMapping("/oracle-search")
-    public ResponseEntity<List<TodoItem>> searchWithOracleVarchar2(@RequestParam String term) {
-        return ResponseEntity.ok(todoService.searchWithOracleVarchar2(term));
+    @GetMapping("/pg-search")
+    public ResponseEntity<List<TodoItem>> searchByTerm(@RequestParam String term) {
+        return ResponseEntity.ok(todoService.searchByTerm(term));
     }
 
-    // Endpoint to demonstrate raw Oracle SQL usage
-    @GetMapping("/oracle-demo")
-    public ResponseEntity<List<Map<String, Object>>> demonstrateOracleSpecificQuery(
+    // Endpoint to demonstrate raw PostgreSQL query
+    @GetMapping("/pg-demo")
+    public ResponseEntity<List<Map<String, Object>>> demonstratePostgreSqlQuery(
             @RequestParam(defaultValue = "") String keyword,
             @RequestParam(defaultValue = "0") int minPriority) {
-        return ResponseEntity.ok(oracleSqlDemonstrator.executeRawOracleQuery(keyword, minPriority));
+        return ResponseEntity.ok(postgreSqlDemonstrator.executeRawQuery(keyword, minPriority));
     }
 
-    // Endpoint to run the Oracle operations demo
-    @PostMapping("/run-oracle-operations")
-    public ResponseEntity<String> runOracleOperations() {
+    // Endpoint to run the database operations demo
+    @PostMapping("/run-pg-operations")
+    public ResponseEntity<String> runDatabaseOperations() {
         try {
-            oracleSqlDemonstrator.performOracleSpecificOperations();
-            return ResponseEntity.ok("Oracle-specific operations executed successfully");
+            postgreSqlDemonstrator.performDatabaseOperations();
+            return ResponseEntity.ok("Database operations executed successfully");
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("Error executing Oracle operations: " + e.getMessage());
+                    .body("Error executing database operations: " + e.getMessage());
         }
     }
 }
