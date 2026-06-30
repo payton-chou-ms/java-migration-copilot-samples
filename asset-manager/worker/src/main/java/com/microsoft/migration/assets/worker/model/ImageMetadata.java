@@ -22,6 +22,12 @@ public class ImageMetadata {
     private String s3Url;
     private String thumbnailKey;
     private String thumbnailUrl;
+    private String realisticKey;
+    private String realisticUrl;
+    private String cyberpunkKey;
+    private String cyberpunkUrl;
+    private String mangaKey;
+    private String mangaUrl;
     private LocalDateTime uploadedAt;
     private LocalDateTime lastModified;
 
