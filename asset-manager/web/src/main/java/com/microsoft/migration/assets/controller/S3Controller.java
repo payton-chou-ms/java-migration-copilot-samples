@@ -2,6 +2,7 @@ package com.microsoft.migration.assets.controller;
 
 import com.microsoft.migration.assets.constants.StorageConstants;
 import com.microsoft.migration.assets.model.S3StorageItem;
+import com.microsoft.migration.assets.repository.ImageMetadataRepository;
 import com.microsoft.migration.assets.service.StorageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.InputStreamResource;
@@ -27,6 +28,7 @@ import java.util.Optional;
 public class S3Controller {
 
     private final StorageService storageService;
+    private final ImageMetadataRepository imageMetadataRepository;
 
     @GetMapping
     public String listObjects(Model model) {
@@ -66,7 +68,16 @@ public class S3Controller {
                     .findFirst();
             
             if (foundObject.isPresent()) {
-                model.addAttribute("object", foundObject.get());
+                S3StorageItem item = foundObject.get();
+                imageMetadataRepository.findAll().stream()
+                        .filter(metadata -> key.equals(metadata.getS3Key()))
+                        .findFirst()
+                        .ifPresent(metadata -> {
+                            item.setRealisticKey(metadata.getRealisticKey());
+                            item.setCyberpunkKey(metadata.getCyberpunkKey());
+                            item.setMangaKey(metadata.getMangaKey());
+                        });
+                model.addAttribute("object", item);
                 return "view";
             } else {
                 redirectAttributes.addFlashAttribute("error", "Image not found");
