@@ -3,6 +3,8 @@ package com.microsoft.migration.todo.controller;
 import com.microsoft.migration.todo.model.TodoItem;
 import com.microsoft.migration.todo.service.TodoService;
 import com.microsoft.migration.todo.util.OracleSqlDemonstrator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -16,6 +18,8 @@ import java.util.Optional;
 @RestController
 @RequestMapping("/api/todos")
 public class TodoController {
+
+    private static final Logger logger = LoggerFactory.getLogger(TodoController.class);
 
     @Autowired
     private TodoService todoService;
@@ -46,6 +50,7 @@ public class TodoController {
             TodoItem updatedTodo = todoService.updateTodo(id, todoDetails);
             return ResponseEntity.ok(updatedTodo);
         } catch (RuntimeException ex) {
+            logger.warn("Failed to update todo id={}", id, ex);
             return ResponseEntity.notFound().build();
         }
     }
@@ -56,6 +61,7 @@ public class TodoController {
             todoService.deleteTodo(id);
             return ResponseEntity.noContent().build();
         } catch (Exception ex) {
+            logger.warn("Failed to delete todo id={}", id, ex);
             return ResponseEntity.notFound().build();
         }
     }
