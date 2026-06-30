@@ -1,47 +1,170 @@
 package com.microsoft.migration.assets.service;
 
+import com.microsoft.migration.assets.model.ImageProcessingMessage;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Base64;
+
+import static com.microsoft.migration.assets.config.RabbitConfig.IMAGE_PROCESSING_QUEUE;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 class LocalFileStorageServiceTest {
 
     @Mock
-    private org.springframework.amqp.rabbit.core.RabbitTemplate rabbitTemplate;
+    private RabbitTemplate rabbitTemplate;
 
     @Mock
     private MultipartFile multipartFile;
 
+    @TempDir
+    Path tempDir;
+
+    private LocalFileStorageService service;
+
+    @BeforeEach
+    void setUp() throws IOException {
+        service = new LocalFileStorageService(rabbitTemplate);
+        ReflectionTestUtils.setField(service, "storageDirectory", tempDir.toString());
+        service.init();
+    }
+
+    // Path safety tests
+    @Test
+    void getObjectThrowsForAbsolutePathKey() {
+        IOException ex = assertThrows(IOException.class,
+                () -> service.getObject("/etc/passwd"));
+        assertTrue(ex.getMessage().contains("Invalid or unsafe key"));
+    }
+
+    @Test
+    void deleteObjectThrowsForAbsolutePathKey() {
+        IOException ex = assertThrows(IOException.class,
+                () -> service.deleteObject("/etc/passwd"));
+        assertTrue(ex.getMessage().contains("Invalid or unsafe key"));
+    }
+
+    @Test
+    void getObjectThrowsForDotDotKey() {
+        IOException ex = assertThrows(IOException.class,
+                () -> service.getObject("../secret.txt"));
+        assertTrue(ex.getMessage().contains("Invalid or unsafe key"));
+    }
+
+    @Test
+    void deleteObjectThrowsForDotDotKey() {
+        IOException ex = assertThrows(IOException.class,
+                () -> service.deleteObject("../../etc/shadow"));
+        assertTrue(ex.getMessage().contains("Invalid or unsafe key"));
+    }
+
+    @Test
+    void getObjectThrowsForNullKey() {
+        assertThrows(IOException.class,
+                () -> service.getObject(null));
+    }
+
+    @Test
+    void getObjectThrowsForBlankKey() {
+        assertThrows(IOException.class,
+                () -> service.getObject("   "));
+    }
+
+    @Test
+    void getObjectSucceedsForValidKey() throws IOException {
+        Path testFile = tempDir.resolve("test.jpg");
+        Files.write(testFile, "data".getBytes());
+        try (java.io.InputStream stream = service.getObject("test.jpg")) {
+            assertArrayEquals("data".getBytes(), stream.readAllBytes());
+        }
+    }
+
+    // File upload validation tests
+    @Test
+    void uploadObjectRejectsExecutableExtension() {
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            "bad.exe",
+            "application/x-msdownload",
+            "bad".getBytes()
+        );
+
+        IOException ex = assertThrows(IOException.class, () -> service.uploadObject(file));
+
+        assertTrue(ex.getMessage().contains("Unsupported file type: bad.exe"));
+    }
+
+    @Test
+    void uploadObjectRejectsUnsupportedMimeType() {
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            "image.png",
+            "text/x-sh",
+            "echo hi".getBytes()
+        );
+
+        IOException ex = assertThrows(IOException.class, () -> service.uploadObject(file));
+
+        assertTrue(ex.getMessage().contains("Unsupported file type: image.png (text/x-sh)"));
+    }
+
+    @Test
+    void uploadObjectAllowsSupportedImageType() throws IOException {
+        // Minimal valid 1x1 white-pixel PNG
+        byte[] pngBytes = Base64.getDecoder().decode(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+        );
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            "photo.PNG",
+            "image/png",
+            pngBytes
+        );
+
+        service.uploadObject(file);
+
+        assertTrue(Files.exists(tempDir.resolve("photo.PNG")));
+        verify(rabbitTemplate).convertAndSend(eq(IMAGE_PROCESSING_QUEUE), any(ImageProcessingMessage.class));
+    }
+
     @Test
     void listObjectsRequiresInitialization() {
-        LocalFileStorageService service = new LocalFileStorageService(rabbitTemplate);
-
-        assertThrows(IllegalStateException.class, service::listObjects);
+        LocalFileStorageService uninitializedService = new LocalFileStorageService(rabbitTemplate);
+        assertThrows(IllegalStateException.class, uninitializedService::listObjects);
     }
 
     @Test
     void uploadObjectRequiresInitialization() {
-        LocalFileStorageService service = new LocalFileStorageService(rabbitTemplate);
-
-        assertThrows(IllegalStateException.class, () -> service.uploadObject(multipartFile));
+        LocalFileStorageService uninitializedService = new LocalFileStorageService(rabbitTemplate);
+        assertThrows(IllegalStateException.class, () -> uninitializedService.uploadObject(multipartFile));
     }
 
     @Test
     void getObjectRequiresInitialization() {
-        LocalFileStorageService service = new LocalFileStorageService(rabbitTemplate);
-
-        assertThrows(IllegalStateException.class, () -> service.getObject("image.png"));
+        LocalFileStorageService uninitializedService = new LocalFileStorageService(rabbitTemplate);
+        assertThrows(IllegalStateException.class, () -> uninitializedService.getObject("image.png"));
     }
 
     @Test
     void deleteObjectRequiresInitialization() {
-        LocalFileStorageService service = new LocalFileStorageService(rabbitTemplate);
-
-        assertThrows(IllegalStateException.class, () -> service.deleteObject("image.png"));
+        LocalFileStorageService uninitializedService = new LocalFileStorageService(rabbitTemplate);
+        assertThrows(IllegalStateException.class, () -> uninitializedService.deleteObject("image.png"));
     }
 }
