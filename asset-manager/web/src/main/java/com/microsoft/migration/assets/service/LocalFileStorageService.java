@@ -91,7 +91,7 @@ public class LocalFileStorageService implements StorageService {
             throw new IOException("Cannot store file with relative path outside current directory");
         }
         
-        Path targetLocation = rootLocation.resolve(filename);
+        Path targetLocation = resolveSafe(filename);
         Files.copy(file.getInputStream(), targetLocation, StandardCopyOption.REPLACE_EXISTING);
         logger.info("Stored file: {}", targetLocation);
 
@@ -106,10 +106,24 @@ public class LocalFileStorageService implements StorageService {
     }
 
     private Path resolveSafe(String key) throws IOException {
-        if (key == null || key.isBlank() || key.contains("..") || Paths.get(key).isAbsolute()) {
+        if (key == null || key.isBlank()) {
             throw new IOException("Invalid or unsafe key: " + key);
         }
-        return rootLocation.resolve(key);
+        Path root = rootLocation.toAbsolutePath().normalize();
+        Path keyPath;
+        try {
+            keyPath = Paths.get(key);
+        } catch (InvalidPathException e) {
+            throw new IOException("Invalid or unsafe key: " + key, e);
+        }
+        if (keyPath.isAbsolute()) {
+            throw new IOException("Invalid or unsafe key: " + key);
+        }
+        Path resolved = root.resolve(keyPath).normalize();
+        if (!resolved.startsWith(root)) {
+            throw new IOException("Invalid or unsafe key: " + key);
+        }
+        return resolved;
     }
 
     @Override
@@ -133,7 +147,7 @@ public class LocalFileStorageService implements StorageService {
 
         // Try to delete thumbnail if it exists
         try {
-            Path thumbnailFile = rootLocation.resolve(getThumbnailKey(key));
+            Path thumbnailFile = resolveSafe(getThumbnailKey(key));
             if (Files.exists(thumbnailFile)) {
                 Files.delete(thumbnailFile);
                 logger.info("Deleted thumbnail file: {}", thumbnailFile);

@@ -14,6 +14,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -79,7 +80,7 @@ public class LocalFileStorageServiceTest {
         Path testFile = tempDir.resolve("test.jpg");
         Files.write(testFile, "data".getBytes());
         try (java.io.InputStream stream = localFileStorageService.getObject("test.jpg")) {
-            assertTrue(stream.available() > 0);
+            assertArrayEquals("data".getBytes(), stream.readAllBytes());
         }
     }
 }
