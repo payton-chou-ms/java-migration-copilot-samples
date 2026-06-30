@@ -2,9 +2,6 @@ package com.microsoft.migration.todo.service;
 
 import com.microsoft.migration.todo.model.TodoItem;
 import com.microsoft.migration.todo.repository.TodoRepository;
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
-import jakarta.persistence.Query;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,9 +15,6 @@ public class TodoService {
 
     @Autowired
     private TodoRepository todoRepository;
-
-    @PersistenceContext
-    private EntityManager entityManager;
 
     public List<TodoItem> getAllTodos() {
         return todoRepository.findAll();
@@ -70,41 +64,18 @@ public class TodoService {
     // Demonstrating Oracle-specific SQL with direct JDBC execution
     @Transactional
     public List<TodoItem> getOverdueTasks() {
-        String oracleSpecificSql = "SELECT * FROM TODO_ITEMS " +
-                                   "WHERE DUE_DATE < SYSDATE " +
-                                   "AND COMPLETED = 0 " +
-                                   "ORDER BY PRIORITY DESC, DUE_DATE ASC";
-
-        Query query = entityManager.createNativeQuery(oracleSpecificSql, TodoItem.class);
-        return query.getResultList();
+        return todoRepository.findOverdue();
     }
 
     // Another example of Oracle-specific SQL
     @Transactional
     public void updateTasksWithOracle(LocalDateTime cutoffDate, int newPriority) {
-        String oracleSql = "UPDATE TODO_ITEMS " +
-                           "SET PRIORITY = :newPriority, " +
-                           "UPDATED_AT = SYSTIMESTAMP " +
-                           "WHERE DUE_DATE < :cutoffDate " +
-                           "AND COMPLETED = 0";
-
-        Query query = entityManager.createNativeQuery(oracleSql)
-                                    .setParameter("newPriority", newPriority)
-                                    .setParameter("cutoffDate", cutoffDate);
-
-        query.executeUpdate();
+        todoRepository.bumpPriorityBefore(cutoffDate, newPriority);
     }
 
     // Example using Oracle's VARCHAR2 data type specifics in a query
     @Transactional
     public List<TodoItem> searchWithOracleVarchar2(String searchTerm) {
-        String oracleSql = "SELECT * FROM TODO_ITEMS " +
-                           "WHERE DBMS_LOB.INSTR(TITLE, :searchTerm) > 0 " +
-                           "OR DBMS_LOB.INSTR(DESCRIPTION, :searchTerm) > 0";
-
-        Query query = entityManager.createNativeQuery(oracleSql, TodoItem.class)
-                                    .setParameter("searchTerm", searchTerm);
-
-        return query.getResultList();
+        return todoRepository.searchVarchar2(searchTerm);
     }
 }

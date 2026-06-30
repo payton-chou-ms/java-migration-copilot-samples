@@ -1,7 +1,6 @@
 package org.sample.azure.student.coreft;
 
-import org.sample.azure.student.coreft.util.MyBatisUtil;
-import com.ibatis.sqlmap.client.SqlMapSession;
+import org.sample.azure.student.coreft.service.StudentService;
 import org.apache.log4j.Logger;
 
 import java.io.IOException;
@@ -22,6 +21,7 @@ import javax.mail.internet.MimeMessage;
 public class AddStudentServlet extends HttpServlet {
 
     private static final Logger logger = Logger.getLogger(AddStudentServlet.class);
+    private final StudentService studentService = new StudentService();
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
@@ -39,44 +39,27 @@ public class AddStudentServlet extends HttpServlet {
         String major = request.getParameter("major");
         boolean success = false;
         String errorMsg = null;
-        SqlMapSession session = null;
         
         try {
             logger.info("Starting to add student: name=" + name + ", email=" + email + ", major=" + major);
-            session = MyBatisUtil.getSqlMapClient().openSession();
-            session.startTransaction();
             
             Map<String, Object> params = new HashMap<>();
             params.put("name", name);
             params.put("email", email);
             params.put("major", major);
             
-            session.insert("com.azure.sample.StudentMapper.addStudent", params);
-            session.commitTransaction();
-            success = true;
-            
-            logger.info("Student added successfully, sending email to: " + email);
-            // Send email notification
-            sendEmail(email, name);
+            success = studentService.addStudent(params);
+            if (success) {
+                logger.info("Student added successfully, sending email to: " + email);
+                // Send email notification
+                sendEmail(email, name);
+            } else {
+                errorMsg = "Failed to add student.";
+            }
             
         } catch (Exception e) {
             logger.error("Error adding student: " + e.getMessage(), e);
             errorMsg = e.getMessage();
-            if (session != null) {
-                try {
-                    session.endTransaction();
-                } catch (Exception rollbackEx) {
-                    logger.error("Error ending transaction: " + rollbackEx.getMessage(), rollbackEx);
-                }
-            }
-        } finally {
-            if (session != null) {
-                try {
-                    session.close();
-                } catch (Exception e) {
-                    logger.error("Error closing session: " + e.getMessage(), e);
-                }
-            }
         }
         
         if (success) {

@@ -16,7 +16,7 @@ public class StudentService {
     
     private static final Logger logger = Logger.getLogger(StudentService.class);
     
-    public List<StudentProfile> getAllStudents() {
+    public List<StudentProfile> listStudents() {
         logger.info("Getting all students from database");
         SqlMapSession session = null;
         List<StudentProfile> students = new ArrayList<>();
@@ -41,9 +41,13 @@ public class StudentService {
         
         return students;
     }
+
+    public List<StudentProfile> getAllStudents() {
+        return listStudents();
+    }
     
-    public boolean saveStudent(String name, String email, String major) {
-        logger.info("Saving student to database: " + name + ", " + email + ", " + major);
+    public boolean addStudent(Map<String, ?> parameters) {
+        logger.info("Saving student to database: " + parameters);
         SqlMapSession session = null;
         boolean success = false;
         
@@ -52,16 +56,11 @@ public class StudentService {
             session.startTransaction();
             
             // Create parameter map for the insert operation
-            Map<String, String> parameters = new HashMap<>();
-            parameters.put("name", name);
-            parameters.put("email", email);
-            parameters.put("major", major);
-            
             // Execute the insert
             session.insert("com.azure.sample.StudentMapper.addStudent", parameters);
             session.commitTransaction();
             
-            logger.info("Student saved successfully: " + name);
+            logger.info("Student saved successfully: " + parameters.get("name"));
             success = true;
             
         } catch (Exception ex) {
@@ -84,5 +83,13 @@ public class StudentService {
         }
         
         return success;
+    }
+
+    public boolean saveStudent(String name, String email, String major) {
+        Map<String, String> parameters = new HashMap<>();
+        parameters.put("name", name);
+        parameters.put("email", email);
+        parameters.put("major", major);
+        return addStudent(parameters);
     }
 }
