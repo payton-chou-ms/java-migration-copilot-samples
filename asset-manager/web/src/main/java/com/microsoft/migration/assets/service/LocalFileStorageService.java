@@ -12,11 +12,18 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.annotation.PostConstruct;
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
 import java.io.*;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import static com.microsoft.migration.assets.config.RabbitConfig.IMAGE_PROCESSING_QUEUE;
@@ -26,6 +33,10 @@ import static com.microsoft.migration.assets.config.RabbitConfig.IMAGE_PROCESSIN
 public class LocalFileStorageService implements StorageService {
 
     private static final Logger logger = LoggerFactory.getLogger(LocalFileStorageService.class);
+    private static final Set<String> ALLOWED_EXT = Collections.unmodifiableSet(
+            new HashSet<>(Arrays.asList("jpg", "jpeg", "png", "gif", "webp")));
+    private static final Set<String> ALLOWED_MIME = Collections.unmodifiableSet(
+            new HashSet<>(Arrays.asList("image/jpeg", "image/png", "image/gif", "image/webp")));
     
     private final RabbitTemplate rabbitTemplate;
     
@@ -86,9 +97,29 @@ public class LocalFileStorageService implements StorageService {
             throw new IOException("Failed to store empty file");
         }
         
-        String filename = StringUtils.cleanPath(file.getOriginalFilename());
+        String originalFilename = file.getOriginalFilename();
+        if (originalFilename == null || originalFilename.isEmpty()) {
+            throw new IOException("Failed to store file with no filename");
+        }
+        String filename = StringUtils.cleanPath(originalFilename);
         if (filename.contains("..")) {
             throw new IOException("Cannot store file with relative path outside current directory");
+        }
+
+        String ext = getExtension(filename).replaceFirst("^\\.", "").toLowerCase(Locale.ROOT);
+        String contentType = file.getContentType();
+        if (!ALLOWED_EXT.contains(ext) ||
+            contentType == null || !ALLOWED_MIME.contains(contentType.toLowerCase(Locale.ROOT))) {
+            throw new IOException("Unsupported file type: " + filename + " (" + contentType + ")");
+        }
+
+        // Validate actual image content to guard against spoofed MIME types / extensions
+        BufferedImage image;
+        try (InputStream imageStream = file.getInputStream()) {
+            image = ImageIO.read(imageStream);
+        }
+        if (image == null) {
+            throw new IOException("File does not contain a valid image: " + filename);
         }
         
         Path targetLocation = resolveSafe(filename);
@@ -161,5 +192,13 @@ public class LocalFileStorageService implements StorageService {
     @Override
     public String getStorageType() {
         return "local";
+    }
+
+    private String getExtension(String filename) {
+        int lastDot = filename.lastIndexOf('.');
+        if (lastDot < 0 || lastDot == filename.length() - 1) {
+            return "";
+        }
+        return filename.substring(lastDot + 1);
     }
 }
