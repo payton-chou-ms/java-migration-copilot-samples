@@ -13,6 +13,7 @@ import com.microsoft.migration.assets.repository.ImageMetadataRepository;
 import lombok.RequiredArgsConstructor;
 import com.azure.messaging.servicebus.ServiceBusMessage;
 import com.azure.messaging.servicebus.ServiceBusSenderClient;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
@@ -90,7 +91,11 @@ public class AwsS3Service implements StorageService {
             getStorageType(),
             file.getSize()
         );
-        senderClient.sendMessage(new ServiceBusMessage(objectMapper.writeValueAsString(message)));
+        try {
+            senderClient.sendMessage(new ServiceBusMessage(objectMapper.writeValueAsString(message)));
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException("Failed to serialize message for key: " + message.getKey(), e);
+        }
 
         // Create and save metadata to database
         ImageMetadata metadata = new ImageMetadata();

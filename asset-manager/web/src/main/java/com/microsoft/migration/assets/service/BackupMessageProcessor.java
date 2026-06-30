@@ -35,6 +35,7 @@ public class BackupMessageProcessor implements SmartLifecycle {
 
     @Override
     public void start() {
+        if (running) return;
         processorClient = new ServiceBusClientBuilder()
                 .fullyQualifiedNamespace(namespace + ".servicebus.windows.net")
                 .credential(new DefaultAzureCredentialBuilder().build())
@@ -64,8 +65,10 @@ public class BackupMessageProcessor implements SmartLifecycle {
 
     @Override
     public void stop() {
+        if (!running) return;
         if (processorClient != null) {
             processorClient.close();
+            processorClient = null;
         }
         running = false;
     }

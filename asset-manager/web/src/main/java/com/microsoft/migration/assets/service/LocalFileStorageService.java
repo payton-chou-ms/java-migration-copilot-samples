@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.azure.messaging.servicebus.ServiceBusMessage;
 import com.azure.messaging.servicebus.ServiceBusSenderClient;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
@@ -136,7 +137,11 @@ public class LocalFileStorageService implements StorageService {
             getStorageType(),
             file.getSize()
         );
-        senderClient.sendMessage(new ServiceBusMessage(objectMapper.writeValueAsString(message)));
+        try {
+            senderClient.sendMessage(new ServiceBusMessage(objectMapper.writeValueAsString(message)));
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException("Failed to serialize message for key: " + message.getKey(), e);
+        }
     }
 
     private Path resolveSafe(String key) throws IOException {
