@@ -153,24 +153,26 @@ public abstract class AbstractFileProcessingService implements FileProcessor {
             outputStream.close();
         } else {
             // For PNG, use compression level 0 (no compression) for best quality
-            javax.imageio.ImageWriteParam pngWriteParam = null;
             if (extension.equalsIgnoreCase("png")) {
                 javax.imageio.ImageWriter pngWriter = ImageIO.getImageWritersByFormatName("png").next();
-                pngWriteParam = pngWriter.getDefaultWriteParam();
-                if (pngWriteParam.canWriteCompressed()) {
-                    pngWriteParam.setCompressionMode(javax.imageio.ImageWriteParam.MODE_EXPLICIT);
-                    pngWriteParam.setCompressionType("Deflate");
-                    pngWriteParam.setCompressionQuality(0.0f); // 0 = best quality for PNG
-                    
-                    javax.imageio.IIOImage outputImage = new javax.imageio.IIOImage(resultImage, null, null);
-                    javax.imageio.stream.ImageOutputStream outputStream = 
-                        javax.imageio.ImageIO.createImageOutputStream(output.toFile());
-                    pngWriter.setOutput(outputStream);
-                    pngWriter.write(null, outputImage, pngWriteParam);
+                try {
+                    javax.imageio.ImageWriteParam pngWriteParam = pngWriter.getDefaultWriteParam();
+                    if (pngWriteParam.canWriteCompressed()) {
+                        pngWriteParam.setCompressionMode(javax.imageio.ImageWriteParam.MODE_EXPLICIT);
+                        pngWriteParam.setCompressionType("Deflate");
+                        pngWriteParam.setCompressionQuality(0.0f); // 0 = best quality for PNG
+
+                        javax.imageio.IIOImage outputImage = new javax.imageio.IIOImage(resultImage, null, null);
+                        try (javax.imageio.stream.ImageOutputStream outputStream =
+                                 javax.imageio.ImageIO.createImageOutputStream(output.toFile())) {
+                            pngWriter.setOutput(outputStream);
+                            pngWriter.write(null, outputImage, pngWriteParam);
+                        }
+                    } else {
+                        ImageIO.write(resultImage, extension, output.toFile());
+                    }
+                } finally {
                     pngWriter.dispose();
-                    outputStream.close();
-                } else {
-                    ImageIO.write(resultImage, extension, output.toFile());
                 }
             } else {
                 // For other formats, use regular write method

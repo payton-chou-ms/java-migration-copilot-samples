@@ -52,6 +52,7 @@ public class LocalFileStorageService implements StorageService {
 
     @Override
     public List<S3StorageItem> listObjects() {
+        ensureInitialized();
         try {
             return Files.walk(rootLocation, 1)
                 .filter(path -> !path.equals(rootLocation))
@@ -82,6 +83,7 @@ public class LocalFileStorageService implements StorageService {
 
     @Override
     public void uploadObject(MultipartFile file) throws IOException {
+        ensureInitialized();
         if (file.isEmpty()) {
             throw new IOException("Failed to store empty file");
         }
@@ -107,6 +109,7 @@ public class LocalFileStorageService implements StorageService {
 
     @Override
     public InputStream getObject(String key) throws IOException {
+        ensureInitialized();
         Path file = rootLocation.resolve(key);
         if (!Files.exists(file)) {
             throw new FileNotFoundException("File not found: " + key);
@@ -116,6 +119,7 @@ public class LocalFileStorageService implements StorageService {
 
     @Override
     public void deleteObject(String key) throws IOException {
+        ensureInitialized();
         // Delete both original and thumbnail if it exists
         Path file = rootLocation.resolve(key);
         if (!Files.exists(file)) {
@@ -140,5 +144,11 @@ public class LocalFileStorageService implements StorageService {
     @Override
     public String getStorageType() {
         return "local";
+    }
+
+    private void ensureInitialized() {
+        if (rootLocation == null) {
+            throw new IllegalStateException("Local storage service has not been initialized");
+        }
     }
 }
