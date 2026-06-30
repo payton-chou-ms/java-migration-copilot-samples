@@ -3,7 +3,7 @@ package org.sample.azure.student.coreft;
 import org.sample.azure.student.coreft.util.MyBatisUtil;
 import com.ibatis.sqlmap.client.SqlMapSession;
 import org.apache.log4j.Logger;
-import org.codehaus.jackson.map.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.io.PrintWriter;

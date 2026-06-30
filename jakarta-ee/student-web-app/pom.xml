@@ -31,23 +31,18 @@
       <scope>provided</scope>
     </dependency>
 
-    <!-- Log4j 1.x (replaces bundled log4j-1.2.17.jar) -->
+    <!-- reload4j – maintained Log4j 1.x drop-in replacement (replaces bundled log4j-1.2.17.jar) -->
     <dependency>
-      <groupId>log4j</groupId>
-      <artifactId>log4j</artifactId>
-      <version>1.2.17</version>
+      <groupId>ch.qos.reload4j</groupId>
+      <artifactId>reload4j</artifactId>
+      <version>1.2.26</version>
     </dependency>
 
-    <!-- Codehaus Jackson (replaces bundled jackson-*-asl-1.9.13.jar) -->
+    <!-- Jackson 2.x (replaces bundled jackson-*-asl-1.9.13.jar) -->
     <dependency>
-      <groupId>org.codehaus.jackson</groupId>
-      <artifactId>jackson-core-asl</artifactId>
-      <version>1.9.13</version>
-    </dependency>
-    <dependency>
-      <groupId>org.codehaus.jackson</groupId>
-      <artifactId>jackson-mapper-asl</artifactId>
-      <version>1.9.13</version>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+      <version>2.17.2</version>
     </dependency>
 
     <!-- Spring MVC (replaces bundled spring-*.jar) -->
@@ -78,6 +73,11 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-war-plugin</artifactId>
         <version>3.4.0</version>
+        <configuration>
+          <!-- Exclude the ibatis jar already present in webapp/WEB-INF/lib to avoid
+               packaging it twice alongside the system-scoped dependency copy. -->
+          <packagingExcludes>WEB-INF/lib/ibatis-sqlmap-2.3.0.jar</packagingExcludes>
+        </configuration>
       </plugin>
     </plugins>
   </build>
