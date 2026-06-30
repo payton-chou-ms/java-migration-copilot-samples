@@ -2,43 +2,40 @@
 <html xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: layout('S3 Object List', ~{::content})}">
 <body>
     <div th:fragment="content">
-        <h2>Your Images</h2>
+        <div class="sx-eyebrow">Gallery</div>
+        <h1 class="sx-h1">Your Images</h1>
 
-        <div class="row mt-4" id="imageContainer" th:if="${not #lists.isEmpty(objects)}">
-            <div class="col-md-4 mb-4" th:each="object : ${objects}" th:attr="data-key=${object.key}">
-                <div class="card">
-                    <img th:src="@{'/storage/view/' + ${object.key}}" class="card-img-top" alt="Image preview" style="height: 200px; object-fit: cover;">
-                    <div class="card-body">
-                        <h5 class="card-title text-truncate" th:text="${object.name}">Image name</h5>
-                        <p class="card-text">
-                            <small class="text-muted">
-                                Size: <span th:text="${#numbers.formatDecimal(object.size / 1024, 0, 2) + ' KB'}">0 KB</span><br>
-                                Last modified: <span th:text="${#temporals.format(object.lastModified, 'dd-MM-yyyy HH:mm')}">Date</span>
-                            </small>
-                        </p>
-                        <div class="d-flex justify-content-between">
-                            <a th:href="@{'/storage/view-page/' + ${object.key}}" class="btn btn-primary btn-sm">View</a>
-                            <form th:action="@{'/storage/delete/' + ${object.key}}" method="post" onsubmit="return confirm('Are you sure you want to delete this file?');">
-                                <button type="submit" class="btn btn-danger btn-sm">Delete</button>
-                            </form>
-                        </div>
+        <div class="sx-grid sx-grid-cards" id="imageContainer" th:if="${not #lists.isEmpty(objects)}">
+            <div class="sx-card" th:each="object : ${objects}" th:attr="data-key=${object.key}">
+                <div style="background:var(--canvas-alt)">
+                    <img th:src="@{'/storage/view/' + ${object.key}}" alt="Image preview"
+                         style="width:100%; height:200px; object-fit:cover;">
+                </div>
+                <div style="padding:16px 18px">
+                    <div style="font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis"
+                         th:text="${object.name}">Image name</div>
+                    <div class="sx-muted" style="font-size:13px; margin:6px 0 14px">
+                        <span th:text="${#numbers.formatDecimal(object.size / 1024, 0, 2) + ' KB'}">0 KB</span>
+                        · <span th:text="${#temporals.format(object.lastModified, 'dd-MM-yyyy HH:mm')}">Date</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; align-items:center">
+                        <a th:href="@{'/storage/view-page/' + ${object.key}}" class="sx-btn sx-btn-primary sx-btn-sm">View</a>
+                        <form th:action="@{'/storage/delete/' + ${object.key}}" method="post"
+                              onsubmit="return confirm('Are you sure you want to delete this file?');">
+                            <button type="submit" class="sx-btn sx-btn-danger sx-btn-sm">Delete</button>
+                        </form>
                     </div>
                 </div>
             </div>
         </div>
 
-        <div class="alert alert-info" th:if="${#lists.isEmpty(objects)}">
-            No images found in the S3 bucket. <a th:href="@{/storage/upload}" class="alert-link">Upload your first image!</a>
+        <div class="sx-alert sx-alert-info" th:if="${#lists.isEmpty(objects)}">
+            No images found. <a th:href="@{/storage/upload}" style="color:var(--indigo)">Upload your first image!</a>
         </div>
 
         <!-- Loading indicator for auto-refreshing -->
         <div id="refreshIndicator" style="display: none">
-            <div class="d-flex justify-content-center">
-                <div class="spinner-border text-primary" role="status">
-                    <span class="visually-hidden">Loading...</span>
-                </div>
-            </div>
-            <p class="text-center mt-2">Checking for new thumbnails...</p>
+            <p class="sx-muted" style="text-align:center; margin-top:16px">Checking for new thumbnails…</p>
         </div>
 
         <!-- Auto-refresh script -->
