@@ -6,7 +6,7 @@ services:
       - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD}
       - MYSQL_DATABASE=studentdb
       - MYSQL_USER=student
-      - MYSQL_PASSWORD=${MYSQL_PASSWORD:?set MYSQL_PASSWORD}
+      - MYSQL_PASSWORD=${DB_PASSWORD:?set DB_PASSWORD}
     ports:
       - "3306:3306"
     volumes:
