@@ -1,7 +1,9 @@
 package com.microsoft.migration.assets.service;
 
+import com.microsoft.migration.assets.model.ImageMetadata;
 import com.microsoft.migration.assets.model.ImageProcessingMessage;
 import com.microsoft.migration.assets.model.S3StorageItem;
+import com.microsoft.migration.assets.repository.ImageMetadataRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.azure.messaging.servicebus.ServiceBusMessage;
@@ -28,6 +30,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 import static com.microsoft.migration.assets.config.ServiceBusConfig.IMAGE_PROCESSING_QUEUE;
@@ -44,15 +47,17 @@ public class LocalFileStorageService implements StorageService {
 
     private final ObjectProvider<ServiceBusSenderClient> senderClientProvider;
     private final ObjectMapper objectMapper;
+    private final ImageMetadataRepository imageMetadataRepository;
 
     @Value("${local.storage.directory:../storage}")
     private String storageDirectory;
 
     private Path rootLocation;
 
-    public LocalFileStorageService(ObjectProvider<ServiceBusSenderClient> senderClientProvider, ObjectMapper objectMapper) {
+    public LocalFileStorageService(ObjectProvider<ServiceBusSenderClient> senderClientProvider, ObjectMapper objectMapper, ImageMetadataRepository imageMetadataRepository) {
         this.senderClientProvider = senderClientProvider;
         this.objectMapper = objectMapper;
+        this.imageMetadataRepository = imageMetadataRepository;
     }
 
     @PostConstruct
@@ -143,7 +148,21 @@ public class LocalFileStorageService implements StorageService {
             if (sender != null) {
                 sender.sendMessage(new ServiceBusMessage(objectMapper.writeValueAsString(message)));
             } else {
-                logger.info("[dev] Service Bus not configured — skipping message for key: {}", message.getKey());
+                logger.info("[dev] Service Bus not configured — creating DB record directly for key: {}", message.getKey());
+                imageMetadataRepository.findFirstByS3Key(filename).ifPresentOrElse(
+                    existing -> logger.debug("[dev] ImageMetadata already exists for key: {}", filename),
+                    () -> {
+                        ImageMetadata meta = new ImageMetadata();
+                        meta.setId(UUID.randomUUID().toString());
+                        meta.setFilename(filename);
+                        meta.setContentType(file.getContentType());
+                        meta.setSize(file.getSize());
+                        meta.setS3Key(filename);
+                        meta.setS3Url("/storage/view/" + filename);
+                        imageMetadataRepository.save(meta);
+                        logger.info("[dev] Created ImageMetadata for key: {}", filename);
+                    }
+                );
             }
         } catch (JsonProcessingException e) {
             throw new RuntimeException("Failed to serialize message for key: " + message.getKey(), e);

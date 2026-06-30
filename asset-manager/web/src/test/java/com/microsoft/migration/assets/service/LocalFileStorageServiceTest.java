@@ -1,5 +1,6 @@
 package com.microsoft.migration.assets.service;
 
+import com.microsoft.migration.assets.repository.ImageMetadataRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -45,6 +46,9 @@ class LocalFileStorageServiceTest {
     @Mock
     private MultipartFile multipartFile;
 
+    @Mock
+    private ImageMetadataRepository imageMetadataRepository;
+
     @TempDir
     Path tempDir;
 
@@ -53,7 +57,7 @@ class LocalFileStorageServiceTest {
     @BeforeEach
     void setUp() throws IOException {
         lenient().when(senderClientProvider.getIfAvailable()).thenReturn(senderClient);
-        service = new LocalFileStorageService(senderClientProvider, new ObjectMapper());
+        service = new LocalFileStorageService(senderClientProvider, new ObjectMapper(), imageMetadataRepository);
         ReflectionTestUtils.setField(service, "storageDirectory", tempDir.toString());
         service.init();
     }
@@ -170,7 +174,7 @@ class LocalFileStorageServiceTest {
     void listObjectsRequiresInitialization() {
         @SuppressWarnings("unchecked")
         ObjectProvider<ServiceBusSenderClient> provider = mock(ObjectProvider.class);
-        LocalFileStorageService uninitializedService = new LocalFileStorageService(provider, new ObjectMapper());
+        LocalFileStorageService uninitializedService = new LocalFileStorageService(provider, new ObjectMapper(), imageMetadataRepository);
         assertThrows(IllegalStateException.class, uninitializedService::listObjects);
     }
 
@@ -178,7 +182,7 @@ class LocalFileStorageServiceTest {
     void uploadObjectRequiresInitialization() {
         @SuppressWarnings("unchecked")
         ObjectProvider<ServiceBusSenderClient> provider = mock(ObjectProvider.class);
-        LocalFileStorageService uninitializedService = new LocalFileStorageService(provider, new ObjectMapper());
+        LocalFileStorageService uninitializedService = new LocalFileStorageService(provider, new ObjectMapper(), imageMetadataRepository);
         assertThrows(IllegalStateException.class, () -> uninitializedService.uploadObject(multipartFile));
     }
 
@@ -186,7 +190,7 @@ class LocalFileStorageServiceTest {
     void getObjectRequiresInitialization() {
         @SuppressWarnings("unchecked")
         ObjectProvider<ServiceBusSenderClient> provider = mock(ObjectProvider.class);
-        LocalFileStorageService uninitializedService = new LocalFileStorageService(provider, new ObjectMapper());
+        LocalFileStorageService uninitializedService = new LocalFileStorageService(provider, new ObjectMapper(), imageMetadataRepository);
         assertThrows(IllegalStateException.class, () -> uninitializedService.getObject("image.png"));
     }
 
@@ -194,7 +198,7 @@ class LocalFileStorageServiceTest {
     void deleteObjectRequiresInitialization() {
         @SuppressWarnings("unchecked")
         ObjectProvider<ServiceBusSenderClient> provider = mock(ObjectProvider.class);
-        LocalFileStorageService uninitializedService = new LocalFileStorageService(provider, new ObjectMapper());
+        LocalFileStorageService uninitializedService = new LocalFileStorageService(provider, new ObjectMapper(), imageMetadataRepository);
         assertThrows(IllegalStateException.class, () -> uninitializedService.deleteObject("image.png"));
     }
 }
