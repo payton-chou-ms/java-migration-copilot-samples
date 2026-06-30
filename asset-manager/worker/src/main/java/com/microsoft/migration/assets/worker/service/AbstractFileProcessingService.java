@@ -57,7 +57,10 @@ public abstract class AbstractFileProcessingService implements FileProcessor, Sm
 
     @Override
     public void start() {
-        processorClientProvider.getObject().start();
+        ServiceBusProcessorClient client = processorClientProvider.getIfAvailable();
+        if (client != null) {
+            client.start();
+        }
         running = true;
     }
 

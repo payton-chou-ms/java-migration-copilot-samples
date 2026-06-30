@@ -9,6 +9,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import com.azure.messaging.servicebus.ServiceBusMessage;
 import com.azure.messaging.servicebus.ServiceBusSenderClient;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.multipart.MultipartFile;
@@ -22,7 +23,10 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class LocalFileStorageServiceTest {
@@ -34,6 +38,10 @@ class LocalFileStorageServiceTest {
     @Mock
     private ServiceBusSenderClient senderClient;
 
+    @SuppressWarnings("unchecked")
+    @Mock
+    private ObjectProvider<ServiceBusSenderClient> senderClientProvider;
+
     @Mock
     private MultipartFile multipartFile;
 
@@ -44,7 +52,8 @@ class LocalFileStorageServiceTest {
 
     @BeforeEach
     void setUp() throws IOException {
-        service = new LocalFileStorageService(senderClient, new ObjectMapper());
+        lenient().when(senderClientProvider.getIfAvailable()).thenReturn(senderClient);
+        service = new LocalFileStorageService(senderClientProvider, new ObjectMapper());
         ReflectionTestUtils.setField(service, "storageDirectory", tempDir.toString());
         service.init();
     }
@@ -159,25 +168,33 @@ class LocalFileStorageServiceTest {
 
     @Test
     void listObjectsRequiresInitialization() {
-        LocalFileStorageService uninitializedService = new LocalFileStorageService(senderClient, new ObjectMapper());
+        @SuppressWarnings("unchecked")
+        ObjectProvider<ServiceBusSenderClient> provider = mock(ObjectProvider.class);
+        LocalFileStorageService uninitializedService = new LocalFileStorageService(provider, new ObjectMapper());
         assertThrows(IllegalStateException.class, uninitializedService::listObjects);
     }
 
     @Test
     void uploadObjectRequiresInitialization() {
-        LocalFileStorageService uninitializedService = new LocalFileStorageService(senderClient, new ObjectMapper());
+        @SuppressWarnings("unchecked")
+        ObjectProvider<ServiceBusSenderClient> provider = mock(ObjectProvider.class);
+        LocalFileStorageService uninitializedService = new LocalFileStorageService(provider, new ObjectMapper());
         assertThrows(IllegalStateException.class, () -> uninitializedService.uploadObject(multipartFile));
     }
 
     @Test
     void getObjectRequiresInitialization() {
-        LocalFileStorageService uninitializedService = new LocalFileStorageService(senderClient, new ObjectMapper());
+        @SuppressWarnings("unchecked")
+        ObjectProvider<ServiceBusSenderClient> provider = mock(ObjectProvider.class);
+        LocalFileStorageService uninitializedService = new LocalFileStorageService(provider, new ObjectMapper());
         assertThrows(IllegalStateException.class, () -> uninitializedService.getObject("image.png"));
     }
 
     @Test
     void deleteObjectRequiresInitialization() {
-        LocalFileStorageService uninitializedService = new LocalFileStorageService(senderClient, new ObjectMapper());
+        @SuppressWarnings("unchecked")
+        ObjectProvider<ServiceBusSenderClient> provider = mock(ObjectProvider.class);
+        LocalFileStorageService uninitializedService = new LocalFileStorageService(provider, new ObjectMapper());
         assertThrows(IllegalStateException.class, () -> uninitializedService.deleteObject("image.png"));
     }
 }

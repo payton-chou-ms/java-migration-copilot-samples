@@ -8,6 +8,7 @@ import com.azure.messaging.servicebus.ServiceBusMessage;
 import com.azure.messaging.servicebus.ServiceBusSenderClient;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
@@ -41,7 +42,7 @@ public class LocalFileStorageService implements StorageService {
     private static final Set<String> ALLOWED_MIME = Collections.unmodifiableSet(
             new HashSet<>(Arrays.asList("image/jpeg", "image/png", "image/gif", "image/webp")));
 
-    private final ServiceBusSenderClient senderClient;
+    private final ObjectProvider<ServiceBusSenderClient> senderClientProvider;
     private final ObjectMapper objectMapper;
 
     @Value("${local.storage.directory:../storage}")
@@ -49,8 +50,8 @@ public class LocalFileStorageService implements StorageService {
 
     private Path rootLocation;
 
-    public LocalFileStorageService(ServiceBusSenderClient senderClient, ObjectMapper objectMapper) {
-        this.senderClient = senderClient;
+    public LocalFileStorageService(ObjectProvider<ServiceBusSenderClient> senderClientProvider, ObjectMapper objectMapper) {
+        this.senderClientProvider = senderClientProvider;
         this.objectMapper = objectMapper;
     }
 
@@ -138,7 +139,12 @@ public class LocalFileStorageService implements StorageService {
             file.getSize()
         );
         try {
-            senderClient.sendMessage(new ServiceBusMessage(objectMapper.writeValueAsString(message)));
+            ServiceBusSenderClient sender = senderClientProvider.getIfAvailable();
+            if (sender != null) {
+                sender.sendMessage(new ServiceBusMessage(objectMapper.writeValueAsString(message)));
+            } else {
+                logger.info("[dev] Service Bus not configured — skipping message for key: {}", message.getKey());
+            }
         } catch (JsonProcessingException e) {
             throw new RuntimeException("Failed to serialize message for key: " + message.getKey(), e);
         }
