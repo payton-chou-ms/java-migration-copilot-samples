@@ -20,7 +20,7 @@
 
     <!-- Mail Session for JavaMail -->
     <mailSession id="StudentMailSession" jndiName="mail/StudentMailSession" description="Mail session for sending emails"
-        host="localhost"
+        host="${env.MAIL_HOST:localhost}"
         from="noreply@example.com"
         port="25"
         transportProtocol="smtp"
@@ -34,7 +34,7 @@
     
     <dataSource id="StudentDB" jndiName="jdbc/StudentDB">
         <jdbcDriver libraryRef="mysql-lib"/>
-        <properties URL="${env.JDBC_URL}"
+        <properties.mysql url="${env.JDBC_URL}"
             user="${env.DB_USER}"
             password="${env.DB_PASSWORD}"/>
         <connectionManager maxPoolSize="10" minPoolSize="2"/>

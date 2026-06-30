@@ -3,10 +3,10 @@ services:
     image: mysql:8.0
     container_name: student-mysql
     environment:
-      MYSQL_ROOT_PASSWORD: rootpassword
-      MYSQL_DATABASE: studentdb
-      MYSQL_USER: student
-      MYSQL_PASSWORD: studentpass
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-studentdb}
+      MYSQL_USER: ${MYSQL_USER:-student}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
     ports:
       - "3306:3306"
     volumes:
@@ -26,9 +26,9 @@ services:
       - "9080:9080"
       - "9443:9443"
     environment:
-      - JDBC_URL=jdbc:mysql://mysql:3306/studentdb?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
-      - DB_USER=student
-      - DB_PASSWORD=studentpass
+      - JDBC_URL=${JDBC_URL:-jdbc:mysql://mysql:3306/studentdb?useSSL=true&serverTimezone=UTC}
+      - DB_USER=${DB_USER:-student}
+      - DB_PASSWORD=${DB_PASSWORD}
     volumes:
       - ./mysql-connector:/opt/ol/wlp/usr/shared/resources/mysql
     networks:
