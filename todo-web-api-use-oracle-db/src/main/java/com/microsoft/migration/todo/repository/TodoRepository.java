@@ -26,7 +26,7 @@ public interface TodoRepository extends JpaRepository<TodoItem, Long> {
     // Another Oracle specific query showing off more Oracle SQL features
     @Query(value = "SELECT * FROM TODO_ITEMS WHERE PRIORITY > :priority AND ROWNUM <= :limit ORDER BY CREATED_AT DESC",
            nativeQuery = true)
-    List<TodoItem> findTopPriorityTasks(int priority, int limit);
+    List<TodoItem> findTopPriorityTasks(@Param("priority") int priority, @Param("limit") int limit);
 
     @Query(value = "SELECT * FROM TODO_ITEMS " +
                    "WHERE DUE_DATE < SYSDATE " +

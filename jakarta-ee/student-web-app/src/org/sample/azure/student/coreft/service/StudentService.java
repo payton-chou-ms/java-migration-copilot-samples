@@ -16,10 +16,11 @@ public class StudentService {
     
     private static final Logger logger = Logger.getLogger(StudentService.class);
     
+    @SuppressWarnings("unchecked")
     public List<StudentProfile> listStudents() {
         logger.info("Getting all students from database");
         SqlMapSession session = null;
-        List<StudentProfile> students = new ArrayList<>();
+        List<StudentProfile> students;
         
         try {
             session = MyBatisUtil.getSqlMapClient().openSession();
@@ -27,8 +28,7 @@ public class StudentService {
             logger.info("Retrieved " + students.size() + " students");
         } catch (Exception ex) {
             logger.error("Error retrieving students: " + ex.getMessage(), ex);
-            // Return empty list in case of error
-            students = new ArrayList<>();
+            throw new RuntimeException("Error retrieving students", ex);
         } finally {
             if (session != null) {
                 try {
