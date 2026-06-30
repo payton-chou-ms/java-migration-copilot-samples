@@ -1,0 +1,277 @@
+{
+  "$schema": "../../../../.vscode/extensions/vscjava.migrate-java-to-azure-1.21.0-darwin-arm64/skills/create-modernization-plan/tasks-schema.json",
+  "description": "Tasks template for modernization plan. Generate this file alongside plan.md to track individual migration tasks.",
+  "tasks": [
+    {
+      "type": "upgrade",
+      "id": "001-upgrade-java-version",
+      "description": "Upgrade Java Version. Addresses issues: Java Version is not the latest LTS.",
+      "reason": "The jakarta-ee/student-web-app module targets a Java version that is not the latest LTS. Upgrading to the latest LTS provides security fixes, performance improvements, and a longer support lifecycle. Subsequent transform tasks depend on the upgraded runtime and project format.",
+      "requirements": "Upgrade the Java runtime to the latest LTS (Java 25) for the affected module(s), primarily jakarta-ee/student-web-app/pom.xml. Perform a JDK/Java version upgrade only; do NOT upgrade Spring Boot, Spring Framework, or Jakarta EE unless required for compatibility with Java 25. Update the build configuration (pom.xml source/target/release) accordingly and ensure the project still builds and tests pass.",
+      "kbId": "java-version-upgrade",
+      "successCriteria": {
+        "passBuild": "true",
+        "generateNewUnitTests": "false",
+        "passUnitTests": "true"
+      }
+    },
+    {
+      "type": "transform",
+      "id": "002-transform-migration-s3-to-azure-blob-storage",
+      "description": "Migrate from AWS S3 to Azure Blob Storage. Addresses issues: AWS S3 usage found.",
+      "reason": "The asset-manager application stores objects in AWS S3, which is not an Azure-native service. Migrating to Azure Blob Storage removes the cross-cloud dependency and enables passwordless authentication on Azure.",
+      "requirements": "Replace AWS S3 SDK usage with the Azure Blob Storage SDK in the asset-manager/web and asset-manager/worker modules. Affected files include asset-manager/web/src/main/java/com/microsoft/migration/assets/config/AwsS3Config.java, asset-manager/worker/src/main/java/com/microsoft/migration/assets/worker/config/AwsS3Config.java, and the application.properties of both modules. Map bucket/object operations to container/blob operations and prefer managed identity for authentication.",
+      "kbId": "s3-to-azure-blob-storage",
+      "dependencies": ["001-upgrade-java-version"],
+      "skills": [
+        {
+          "name": "migration-s3-to-azure-blob-storage",
+          "location": "builtin"
+        }
+      ],
+      "successCriteria": {
+        "passBuild": "true",
+        "generateNewUnitTests": "false",
+        "passUnitTests": "true"
+      }
+    },
+    {
+      "type": "transform",
+      "id": "003-transform-migration-amqp-rabbitmq-to-servicebus",
+      "description": "Migrate from RabbitMQ(AMQP) to Azure Service Bus. Addresses issues: RabbitMQ connection string, username or password found in configuration file.",
+      "reason": "The asset-manager modules use RabbitMQ AMQP messaging with credentials stored in configuration. Migrating to Azure Service Bus provides a managed messaging service with passwordless authentication.",
+      "requirements": "Replace Spring AMQP RabbitMQ messaging with Azure Service Bus in asset-manager/web and asset-manager/worker. Update the RabbitMQ connection settings in asset-manager/web/src/main/resources/application.properties and asset-manager/worker/src/main/resources/application.properties, and migrate message producers and consumers to Azure Service Bus. Prefer managed identity (passwordless) authentication.",
+      "kbId": "amqp-rabbitmq-servicebus",
+      "dependencies": ["002-transform-migration-s3-to-azure-blob-storage"],
+      "skills": [
+        {
+          "name": "migration-amqp-rabbitmq-servicebus",
+          "location": "builtin"
+        }
+      ],
+      "successCriteria": {
+        "passBuild": "true",
+        "generateNewUnitTests": "false",
+        "passUnitTests": "true"
+      }
+    },
+    {
+      "type": "transform",
+      "id": "004-transform-mi-azure-sql",
+      "description": "Secure Azure SQL Database with Managed Identity. Addresses issues: Microsoft SQL database found.",
+      "reason": "The mi-sql-public-demo module connects to Microsoft SQL using password-based authentication. Switching to Azure Managed Identity removes hardcoded database credentials and secures the connection.",
+      "requirements": "Migrate mi-sql-public-demo from password-based authentication to Azure Managed Identity for Azure SQL Database. Update mi-sql-public-demo/src/main/resources/application.properties and the datasource configuration for passwordless authentication, removing any stored database passwords.",
+      "kbId": "mi-azure-sql",
+      "dependencies": ["003-transform-migration-amqp-rabbitmq-to-servicebus"],
+      "skills": [
+        {
+          "name": "migration-mi-azure-sql",
+          "location": "builtin"
+        }
+      ],
+      "successCriteria": {
+        "passBuild": "true",
+        "generateNewUnitTests": "false",
+        "passUnitTests": "true"
+      }
+    },
+    {
+      "type": "transform",
+      "id": "005-transform-migration-oracle-to-postgresql",
+      "description": "Migrate from Oracle DB to PostgreSQL. Addresses issues: Oracle database found.",
+      "reason": "The todo-web-api-use-oracle-db module depends on Oracle Database. Migrating to PostgreSQL enables the use of Azure Database for PostgreSQL and removes the Oracle licensing dependency.",
+      "requirements": "Migrate the todo-web-api-use-oracle-db data access layer from Oracle Database to PostgreSQL, including JDBC driver changes, Oracle-to-PostgreSQL SQL syntax conversion, and replacement of Oracle-specific features. Update todo-web-api-use-oracle-db/src/main/resources/application.yaml accordingly. Use project-specific coding notes when available.",
+      "kbId": "oracle-to-postgresql",
+      "dependencies": ["004-transform-mi-azure-sql"],
+      "skills": [
+        {
+          "name": "migration-oracle-to-postgresql",
+          "location": "builtin"
+        }
+      ],
+      "successCriteria": {
+        "passBuild": "true",
+        "generateNewUnitTests": "false",
+        "passUnitTests": "true"
+      }
+    },
+    {
+      "type": "transform",
+      "id": "006-transform-mi-postgresql",
+      "description": "Secure Azure Database for PostgreSQL with Managed Identity. Addresses issues: PostgreSQL database found.",
+      "reason": "The asset-manager modules connect to PostgreSQL using password-based authentication. Switching to Azure Managed Identity removes hardcoded database credentials and secures the connection.",
+      "requirements": "Migrate the asset-manager/web and asset-manager/worker modules from password-based PostgreSQL authentication to Azure Managed Identity for Azure Database for PostgreSQL. Update the datasource configuration in asset-manager/web/src/main/resources/application.properties and asset-manager/worker/src/main/resources/application.properties for passwordless authentication, removing stored database passwords.",
+      "kbId": "mi-postgresql",
+      "dependencies": ["005-transform-migration-oracle-to-postgresql"],
+      "skills": [
+        {
+          "name": "migration-mi-postgresql",
+          "location": "builtin"
+        }
+      ],
+      "successCriteria": {
+        "passBuild": "true",
+        "generateNewUnitTests": "false",
+        "passUnitTests": "true"
+      }
+    },
+    {
+      "type": "transform",
+      "id": "007-transform-mi-mysql",
+      "description": "Migrate to Azure Database for MySQL. Addresses issues: MySQL database found.",
+      "reason": "The jakarta-ee/student-web-app module uses MySQL with password-based authentication. Migrating to Azure Database for MySQL with Managed Identity provides a managed datastore and removes stored credentials.",
+      "requirements": "Migrate jakarta-ee/student-web-app to Azure Database for MySQL using Azure Managed Identity for passwordless authentication. Affected references include jakarta-ee/student-web-app/docker-compose.yml and the bundled jakarta-ee/student-web-app/mysql-connector driver. Update datasource configuration for passwordless authentication and remove stored MySQL passwords.",
+      "kbId": "mi-mysql",
+      "dependencies": ["006-transform-mi-postgresql"],
+      "skills": [
+        {
+          "name": "migration-mi-mysql",
+          "location": "builtin"
+        }
+      ],
+      "successCriteria": {
+        "passBuild": "true",
+        "generateNewUnitTests": "false",
+        "passUnitTests": "true"
+      }
+    },
+    {
+      "type": "transform",
+      "id": "008-transform-openliberty-database-to-azure",
+      "description": "Migrate from Open Liberty Database to Azure Database Services. Addresses issues: Detect application-level data source references.",
+      "reason": "The jakarta-ee/student-web-app module declares application-level Open Liberty data source references that bind to non-Azure resources, which are not cloud-ready.",
+      "requirements": "Migrate the application-level Open Liberty data source references in jakarta-ee/student-web-app/src/main/webapp/WEB-INF/web.xml (and related Liberty configuration) to use Azure Database Services. Externalize the connection configuration so the application targets the appropriate Azure managed database, preferring managed identity authentication where applicable.",
+      "dependencies": ["007-transform-mi-mysql"],
+      "successCriteria": {
+        "passBuild": "true",
+        "generateNewUnitTests": "false",
+        "passUnitTests": "true"
+      }
+    },
+    {
+      "type": "transform",
+      "id": "009-transform-javamail-to-azure-communication-service",
+      "description": "Migrate to Azure Communication Service Email. Addresses issues: Java Mail API.",
+      "reason": "The jakarta-ee/student-web-app module uses the JavaMail API for sending email, which relies on an external SMTP/mail session. Migrating to Azure Communication Service Email provides a managed, cloud-native email capability.",
+      "requirements": "Replace JavaMail (javax.mail) email sending with Azure Communication Service Email in jakarta-ee/student-web-app. The mail session is defined in jakarta-ee/student-web-app/liberty_config/server-docker.xml. Migrate message construction, authentication, and sending to the Azure Communication Service equivalents.",
+      "kbId": "javax.email-send-to-azure-communication-service-email",
+      "dependencies": ["008-transform-openliberty-database-to-azure"],
+      "skills": [
+        {
+          "name": "migration-javax.email-send-to-azure-communication-service-email",
+          "location": "builtin"
+        }
+      ],
+      "successCriteria": {
+        "passBuild": "true",
+        "generateNewUnitTests": "false",
+        "passUnitTests": "true"
+      }
+    },
+    {
+      "type": "transform",
+      "id": "010-transform-migrate-to-console-logging",
+      "description": "Migrate to Console Logging. Addresses issues: Avoid File System Logging in Configuration.",
+      "reason": "The jakarta-ee/student-web-app logging configuration writes to the file system, which is not appropriate for cloud-native and containerized deployments where console logging is preferred.",
+      "requirements": "Migrate the jakarta-ee/student-web-app logging from file-based output to console-only output. Remove file appenders from jakarta-ee/student-web-app/src/main/resources/logback.xml and jakarta-ee/student-web-app/build/log4j.properties so all log output is directed to the console.",
+      "kbId": "log-to-console",
+      "dependencies": ["009-transform-javamail-to-azure-communication-service"],
+      "skills": [
+        {
+          "name": "migration-log-to-console",
+          "location": "builtin"
+        }
+      ],
+      "successCriteria": {
+        "passBuild": "true",
+        "generateNewUnitTests": "false",
+        "passUnitTests": "true"
+      }
+    },
+    {
+      "type": "transform",
+      "id": "011-transform-migrate-aws-region-to-azure-region",
+      "description": "Migrate from AWS Region Configuration to Azure Region Configuration. Addresses issues: AWS region configuration.",
+      "reason": "The asset-manager modules contain AWS region configuration that is specific to AWS services and not applicable when running on Azure.",
+      "requirements": "Replace AWS region configuration with the equivalent Azure region configuration in the asset-manager/web and asset-manager/worker modules. Affected files include asset-manager/web/src/main/resources/application.properties, asset-manager/worker/src/main/resources/application.properties, asset-manager/web/src/main/java/com/microsoft/migration/assets/config/AwsS3Config.java, and asset-manager/worker/src/main/java/com/microsoft/migration/assets/worker/config/AwsS3Config.java. Externalize the region setting via configuration.",
+      "dependencies": ["010-transform-migrate-to-console-logging"],
+      "successCriteria": {
+        "passBuild": "true",
+        "generateNewUnitTests": "false",
+        "passUnitTests": "true"
+      }
+    },
+    {
+      "type": "transform",
+      "id": "012-transform-migrate-local-resource-to-azure",
+      "description": "Migrate the Local Resource to Azure. Addresses issues: Local JDBC Calls, Localhost Usage.",
+      "reason": "Several modules reference localhost resources (local JDBC datasources and localhost endpoints) that are unreachable when the application runs in Azure. Migrating these local resources to managed Azure services is required for cloud readiness.",
+      "requirements": "Replace localhost/local JDBC datasource references with Azure-hosted resources across the affected files: asset-manager/worker/src/main/resources/application.properties, asset-manager/web/src/main/resources/application.properties, todo-web-api-use-oracle-db/src/main/resources/application.yaml, jakarta-ee/student-web-app/docker-compose.yml, and jakarta-ee/student-web-app/liberty_config/server-docker.xml. Externalize endpoints/connection settings via configuration so the application targets Azure managed services instead of localhost. Prefer managed identity authentication where applicable.",
+      "dependencies": ["011-transform-migrate-aws-region-to-azure-region"],
+      "successCriteria": {
+        "passBuild": "true",
+        "generateNewUnitTests": "false",
+        "passUnitTests": "true"
+      }
+    },
+    {
+      "type": "transform",
+      "id": "013-transform-plaintext-credential-to-azure-keyvault",
+      "description": "Migrate from Plaintext Credentials to Azure Key Vault. Addresses issues: Password found in configuration file.",
+      "reason": "Plaintext passwords are stored in application configuration files, which is a credential-exposure risk. Moving them to Azure Key Vault enables secure, centralized secret management.",
+      "requirements": "Migrate plaintext credentials (passwords stored in configuration) to Azure Key Vault for the affected files: asset-manager/web/src/main/resources/application.properties, asset-manager/worker/src/main/resources/application.properties, and todo-web-api-use-oracle-db/src/main/resources/application.yaml. Remove plaintext secrets and retrieve them from Azure Key Vault, preferring managed identity for Key Vault access.",
+      "kbId": "plaintext-credential-to-azure-keyvault",
+      "dependencies": ["012-transform-migrate-local-resource-to-azure"],
+      "skills": [
+        {
+          "name": "migration-plaintext-credential-to-azure-keyvault",
+          "location": "builtin"
+        }
+      ],
+      "successCriteria": {
+        "passBuild": "true",
+        "generateNewUnitTests": "false",
+        "passUnitTests": "true"
+      }
+    },
+    {
+      "type": "transform",
+      "id": "014-transform-remove-hardcoded-credentials",
+      "description": "Remove Hardcoded Credentials. Addresses issues: CRA: Hard-coded credentials in configuration files, CRA: Default or well-known password detected.",
+      "reason": "Hard-coded and default/well-known credentials were detected in configuration files. These must be removed to eliminate credential-exposure risk before deployment.",
+      "requirements": "Remove hard-coded and default/well-known credentials from configuration. Affected files include asset-manager/web/src/main/resources/application.properties, asset-manager/worker/src/main/resources/application.properties, and jakarta-ee/student-web-app/liberty_config/server-docker.xml. Externalize remaining secrets to a secure store (environment variables / Azure Key Vault / managed identity) and remove default or well-known password literals.",
+      "dependencies": ["013-transform-plaintext-credential-to-azure-keyvault"],
+      "successCriteria": {
+        "passBuild": "true",
+        "generateNewUnitTests": "false",
+        "passUnitTests": "true"
+      }
+    },
+    {
+      "type": "security",
+      "id": "015-security-scan-and-fix-cve",
+      "description": "Scan and fix CVE vulnerabilities for this project.",
+      "reason": "Modernization plans must remediate known security vulnerabilities in declared dependencies before deployment. The assessment was run with a minimum CVE severity of high.",
+      "requirements": "Scan all project dependencies for known CVEs (minimum severity: high) and remediate identified vulnerabilities by upgrading to the minimum patched versions. If a fix requires a major version upgrade, document the dependency, current version, upgraded version, and breaking-change risk. Verify that the project builds and all tests pass after remediation.",
+      "dependencies": ["014-transform-remove-hardcoded-credentials"],
+      "skills": [
+        {
+          "name": "validate-cves-and-fix",
+          "location": "builtin"
+        }
+      ],
+      "successCriteria": {
+        "passBuild": "true",
+        "generateNewUnitTests": "false",
+        "passUnitTests": "true"
+      }
+    }
+  ],
+  "metadata": {
+    "planName": "Cloud Readiness Modernization Plan",
+    "projectName": "java-migration-copilot-samples-lab2",
+    "language": "java",
+    "createdAt": "2026-06-30T00:00:00.000Z",
+    "version": "1.0"
+  }
+}

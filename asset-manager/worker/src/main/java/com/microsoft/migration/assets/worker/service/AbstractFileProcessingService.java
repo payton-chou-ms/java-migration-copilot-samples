@@ -7,9 +7,9 @@ import com.azure.messaging.servicebus.ServiceBusProcessorClient;
 import com.azure.messaging.servicebus.ServiceBusReceivedMessageContext;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.SmartLifecycle;
-import org.springframework.context.annotation.Lazy;
 import lombok.extern.slf4j.Slf4j;
 
 import javax.imageio.IIOImage;
@@ -30,9 +30,8 @@ public abstract class AbstractFileProcessingService implements FileProcessor, Sm
     @Autowired
     private ObjectMapper objectMapper;
 
-    @Lazy
     @Autowired
-    private ServiceBusProcessorClient processorClient;
+    private ObjectProvider<ServiceBusProcessorClient> processorClientProvider;
 
     private volatile boolean running = false;
 
@@ -54,14 +53,15 @@ public abstract class AbstractFileProcessingService implements FileProcessor, Sm
 
     @Override
     public void start() {
-        processorClient.start();
+        processorClientProvider.getObject().start();
         running = true;
     }
 
     @Override
     public void stop() {
-        if (processorClient != null) {
-            processorClient.close();
+        ServiceBusProcessorClient client = processorClientProvider.getIfAvailable();
+        if (client != null) {
+            client.close();
         }
         running = false;
     }
