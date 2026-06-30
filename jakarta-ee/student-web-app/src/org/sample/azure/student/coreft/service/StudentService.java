@@ -7,7 +7,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -17,10 +16,11 @@ public class StudentService {
     
     private static final Logger logger = LoggerFactory.getLogger(StudentService.class);
     
-    public List<StudentProfile> getAllStudents() {
+    @SuppressWarnings("unchecked")
+    public List<StudentProfile> listStudents() {
         logger.info("Getting all students from database");
         SqlSession session = null;
-        List<StudentProfile> students = new ArrayList<>();
+        List<StudentProfile> students;
         
         try {
             session = MyBatisUtil.getSqlSessionFactory().openSession();
@@ -28,8 +28,7 @@ public class StudentService {
             logger.info("Retrieved {} students", students.size());
         } catch (Exception ex) {
             logger.error("Error retrieving students: {}", ex.getMessage(), ex);
-            // Return empty list in case of error
-            students = new ArrayList<>();
+            throw new RuntimeException("Error retrieving students", ex);
         } finally {
             if (session != null) {
                 try {
@@ -42,26 +41,21 @@ public class StudentService {
         
         return students;
     }
+
+    public List<StudentProfile> getAllStudents() {
+        return listStudents();
+    }
     
-    public boolean saveStudent(String name, String email, String major) {
-        logger.info("Saving student to database: {}, {}, {}", name, email, major);
+    public boolean addStudent(Map<String, ?> parameters) {
+        logger.info("Saving student to database: {}", parameters);
         SqlSession session = null;
         boolean success = false;
         
         try {
             session = MyBatisUtil.getSqlSessionFactory().openSession();
-            
-            // Create parameter map for the insert operation
-            Map<String, String> parameters = new HashMap<>();
-            parameters.put("name", name);
-            parameters.put("email", email);
-            parameters.put("major", major);
-            
-            // Execute the insert
             session.insert("com.azure.sample.StudentMapper.addStudent", parameters);
             session.commit();
-            
-            logger.info("Student saved successfully: {}", name);
+            logger.info("Student saved successfully: {}", parameters.get("name"));
             success = true;
             
         } catch (Exception ex) {
@@ -84,5 +78,13 @@ public class StudentService {
         }
         
         return success;
+    }
+
+    public boolean saveStudent(String name, String email, String major) {
+        Map<String, String> parameters = new HashMap<>();
+        parameters.put("name", name);
+        parameters.put("email", email);
+        parameters.put("major", major);
+        return addStudent(parameters);
     }
 }

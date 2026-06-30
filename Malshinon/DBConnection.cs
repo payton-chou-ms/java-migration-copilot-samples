@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Configuration;
 using MySql.Data.MySqlClient;
 
 namespace Malshinon
@@ -9,13 +10,37 @@ namespace Malshinon
     {
         public static MySqlConnection Connect(string cs = null)
         {
-            var connStr = string.IsNullOrWhiteSpace(cs)
-                ? "server=127.0.0.1;uid=root;password=;database=malshinon"
-            : cs;
+            var connStr = ResolveConnectionString(cs);
 
             MySqlConnection conn = new MySqlConnection(connStr);
             conn.Open();
             return conn;
+        }
+
+        private static string ResolveConnectionString(string cs)
+        {
+            if (!string.IsNullOrWhiteSpace(cs))
+            {
+                return cs;
+            }
+
+            var envConnectionString = Environment.GetEnvironmentVariable("DB_CONNECTION_STRING");
+            if (!string.IsNullOrWhiteSpace(envConnectionString))
+            {
+                return envConnectionString;
+            }
+
+            var configuredConnectionString =
+                ConfigurationManager.ConnectionStrings["DB_CONNECTION_STRING"]?.ConnectionString
+                ?? ConfigurationManager.AppSettings["DB_CONNECTION_STRING"];
+
+            if (!string.IsNullOrWhiteSpace(configuredConnectionString))
+            {
+                return configuredConnectionString;
+            }
+
+            throw new InvalidOperationException(
+                "Database connection string is not configured. Set DB_CONNECTION_STRING environment variable or configuration value.");
         }
 
         public static void Disconnect(MySqlConnection conn) => conn.Close();

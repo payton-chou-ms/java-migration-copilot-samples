@@ -11,7 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
-import javax.annotation.PostConstruct;
+import jakarta.annotation.PostConstruct;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.*;
@@ -200,7 +200,6 @@ public class LocalFileStorageService implements StorageService {
             throw new IllegalStateException("Local storage service has not been initialized");
         }
     }
-
     private String getExtension(String filename) {
         int lastDot = filename.lastIndexOf('.');
         if (lastDot < 0 || lastDot == filename.length() - 1) {
