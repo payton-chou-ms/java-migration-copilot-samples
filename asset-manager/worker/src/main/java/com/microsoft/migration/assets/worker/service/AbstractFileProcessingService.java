@@ -117,10 +117,10 @@ public abstract class AbstractFileProcessingService implements FileProcessor {
 
         if (originalWidth > originalHeight) {
             thumbnailWidth = maxDimension;
-            thumbnailHeight = (int) (maxDimension / aspectRatio);
+            thumbnailHeight = Math.max(1, (int) Math.round(maxDimension / aspectRatio));
         } else {
             thumbnailHeight = maxDimension;
-            thumbnailWidth = (int) (maxDimension * aspectRatio);
+            thumbnailWidth = Math.max(1, (int) Math.round(maxDimension * aspectRatio));
         }
 
         // Multi-step scaling for higher quality
@@ -147,7 +147,7 @@ public abstract class AbstractFileProcessingService implements FileProcessor {
             jpgWriteParam.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
             // Higher compression quality (0.95 for maximum clarity)
             jpgWriteParam.setCompressionQuality(0.95f);
-            writeWithWriter(jpgWriter, jpgWriteParam, resultImage, output);
+            writeWithWriter(jpgWriter, jpgWriteParam, new IIOImage(resultImage, null, null), output);
         } else {
             // For PNG, use compression level 0 (no compression) for best quality
             if (extension.equalsIgnoreCase("png")) {
@@ -157,7 +157,7 @@ public abstract class AbstractFileProcessingService implements FileProcessor {
                     pngWriteParam.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
                     pngWriteParam.setCompressionType("Deflate");
                     pngWriteParam.setCompressionQuality(0.0f); // 0 = best quality for PNG
-                    writeWithWriter(pngWriter, pngWriteParam, resultImage, output);
+                    writeWithWriter(pngWriter, pngWriteParam, new IIOImage(resultImage, null, null), output);
                 } else {
                     pngWriter.dispose();
                     ImageIO.write(resultImage, extension, output.toFile());
@@ -171,11 +171,17 @@ public abstract class AbstractFileProcessingService implements FileProcessor {
         log.info("Successfully generated thumbnail: {}", output);
     }
 
-    private void writeWithWriter(ImageWriter writer, ImageWriteParam param,
-                                  BufferedImage image, Path output) throws IOException {
-        try (ImageOutputStream ios = ImageIO.createImageOutputStream(output.toFile())) {
-            writer.setOutput(ios);
-            writer.write(null, new IIOImage(image, null, null), param);
+    private void writeWithWriter(ImageWriter writer,
+                                 ImageWriteParam writeParam,
+                                 IIOImage outputImage,
+                                 Path destination) throws IOException {
+        ImageOutputStream outputStream = ImageIO.createImageOutputStream(destination.toFile());
+        if (outputStream == null) {
+            throw new IOException("Unable to create ImageOutputStream for destination: " + destination);
+        }
+        try (ImageOutputStream stream = outputStream) {
+            writer.setOutput(stream);
+            writer.write(null, outputImage, writeParam);
         } finally {
             writer.dispose();
         }
