@@ -36,7 +36,9 @@
         <jdbcDriver libraryRef="mysql-lib"/>
         <properties.mysql url="${env.JDBC_URL}"
             user="${env.DB_USER}"
-            password="${env.DB_PASSWORD}"/>
+            authenticationPlugins="com.azure.identity.extensions.jdbc.mysql.AzureMysqlAuthenticationPlugin"
+            defaultAuthenticationPlugin="com.azure.identity.extensions.jdbc.mysql.AzureMysqlAuthenticationPlugin"
+            sslMode="REQUIRED"/>
         <connectionManager maxPoolSize="10" minPoolSize="2"/>
     </dataSource>
 
