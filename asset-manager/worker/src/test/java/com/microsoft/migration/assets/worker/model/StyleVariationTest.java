@@ -30,4 +30,26 @@ class StyleVariationTest {
         assertNull(m.getRealisticKey());
         assertNull(m.getMangaKey());
     }
+
+    @Test
+    void applyRealisticSetsOnlyRealisticFields() {
+        ImageMetadata m = new ImageMetadata();
+        StyleVariation.REALISTIC.apply(m, "r.png", "http://u/r.png");
+
+        assertEquals("r.png", m.getRealisticKey());
+        assertEquals("http://u/r.png", m.getRealisticUrl());
+        assertNull(m.getCyberpunkKey());
+        assertNull(m.getMangaKey());
+    }
+
+    @Test
+    void applyMangaSetsOnlyMangaFields() {
+        ImageMetadata m = new ImageMetadata();
+        StyleVariation.MANGA.apply(m, "m.png", "http://u/m.png");
+
+        assertEquals("m.png", m.getMangaKey());
+        assertEquals("http://u/m.png", m.getMangaUrl());
+        assertNull(m.getRealisticKey());
+        assertNull(m.getCyberpunkKey());
+    }
 }

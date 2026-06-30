@@ -1,5 +1,7 @@
 package com.microsoft.migration.assets.worker.model;
 
+import java.util.Objects;
+
 public enum StyleVariation {
 
     REALISTIC("realistic",
@@ -33,8 +35,9 @@ public enum StyleVariation {
         return prompt;
     }
 
-    /** Build the blob key for this style, e.g. "abc-photo.png" -> "abc-photo_realistic.png". */
+    /** Build the blob key for this style, e.g. "photo.png" -> "photo_realistic.png" (for REALISTIC). */
     public String keyFor(String originalKey) {
+        Objects.requireNonNull(originalKey, "originalKey must not be null");
         int dot = originalKey.lastIndexOf('.');
         if (dot > 0) {
             return originalKey.substring(0, dot) + "_" + id + originalKey.substring(dot);
@@ -57,6 +60,7 @@ public enum StyleVariation {
                 metadata.setMangaKey(key);
                 metadata.setMangaUrl(url);
             }
+            default -> throw new IllegalStateException("Unhandled StyleVariation: " + this);
         }
     }
 }
