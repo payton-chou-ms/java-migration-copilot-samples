@@ -11,7 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
-import javax.annotation.PostConstruct;
+import jakarta.annotation.PostConstruct;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.*;
@@ -189,21 +189,6 @@ public class LocalFileStorageService implements StorageService {
     @Override
     public String getStorageType() {
         return "local";
-    }
-
-    private Path resolveSafe(String key) throws IOException {
-        if (key == null || key.trim().isEmpty()) {
-            throw new IOException("Invalid or unsafe key: " + key);
-        }
-        Path normalizedKeyPath = Paths.get(key).normalize();
-        if (normalizedKeyPath.isAbsolute() || normalizedKeyPath.startsWith("..")) {
-            throw new IOException("Invalid or unsafe key: " + key);
-        }
-        Path resolved = rootLocation.resolve(normalizedKeyPath).normalize();
-        if (!resolved.startsWith(rootLocation.normalize())) {
-            throw new IOException("Path traversal attempt detected: " + key);
-        }
-        return resolved;
     }
 
     private String getExtension(String filename) {

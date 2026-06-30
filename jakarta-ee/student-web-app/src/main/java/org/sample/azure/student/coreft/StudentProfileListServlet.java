@@ -1,7 +1,6 @@
 package org.sample.azure.student.coreft;
 
-import org.sample.azure.student.coreft.util.MyBatisUtil;
-import org.apache.ibatis.session.SqlSession;
+import org.sample.azure.student.coreft.service.StudentService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -16,6 +15,11 @@ import javax.servlet.http.HttpServletResponse;
 public class StudentProfileListServlet extends HttpServlet {
 
     private static final Logger logger = LoggerFactory.getLogger(StudentProfileListServlet.class);
+    private final StudentService studentService;
+
+    public StudentProfileListServlet() {
+        studentService = new StudentService();
+    }
 
     private static String esc(String s) {
         if (s == null) return "";
@@ -37,11 +41,8 @@ public class StudentProfileListServlet extends HttpServlet {
             out.println("<html><head><title>Student Profile List</title></head><body>");
             out.println("<h2>Student Profile List</h2>");
             
-            SqlSession session = null;
             try {
-                session = MyBatisUtil.getSqlSessionFactory().openSession();
-
-                List<StudentProfile> students = session.selectList("com.azure.sample.StudentMapper.listStudent");
+                List<StudentProfile> students = studentService.listStudents();
                 
                 out.println("<table border='1'><tr><th>ID</th><th>Name</th><th>Email</th><th>Major</th></tr>");
                 for (StudentProfile student : students) {
@@ -57,14 +58,6 @@ public class StudentProfileListServlet extends HttpServlet {
                 logger.error("Error retrieving student list: {}", ex.getMessage(), ex);
                 response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
                 out.println("<p>Error: Unable to retrieve student list.</p>");
-            } finally {
-                if (session != null) {
-                    try {
-                        session.close();
-                    } catch (Exception e) {
-                        logger.error("Error closing session: {}", e.getMessage(), e);
-                    }
-                }
             }
             out.println("</body></html>");
         }
