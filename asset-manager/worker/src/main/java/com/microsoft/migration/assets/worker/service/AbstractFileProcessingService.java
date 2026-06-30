@@ -2,11 +2,15 @@ package com.microsoft.migration.assets.worker.service;
 
 import com.microsoft.migration.assets.worker.model.ImageProcessingMessage;
 import com.microsoft.migration.assets.worker.util.StorageUtil;
-import com.rabbitmq.client.Channel;
+import com.azure.identity.DefaultAzureCredentialBuilder;
+import com.azure.messaging.servicebus.ServiceBusClientBuilder;
+import com.azure.messaging.servicebus.ServiceBusProcessorClient;
+import com.azure.messaging.servicebus.ServiceBusReceivedMessageContext;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.SmartLifecycle;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.amqp.rabbit.annotation.RabbitListener;
-import org.springframework.amqp.support.AmqpHeaders;
-import org.springframework.messaging.handler.annotation.Header;
 
 import javax.imageio.IIOImage;
 import javax.imageio.ImageIO;
@@ -20,15 +24,58 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-import static com.microsoft.migration.assets.worker.config.RabbitConfig.IMAGE_PROCESSING_QUEUE;
+import static com.microsoft.migration.assets.worker.config.ServiceBusConfig.IMAGE_PROCESSING_QUEUE;
 
 @Slf4j
-public abstract class AbstractFileProcessingService implements FileProcessor {
+public abstract class AbstractFileProcessingService implements FileProcessor, SmartLifecycle {
 
-    @RabbitListener(queues = IMAGE_PROCESSING_QUEUE)
-    public void processImage(final ImageProcessingMessage message, 
-                           Channel channel, 
-                           @Header(AmqpHeaders.DELIVERY_TAG) long deliveryTag) {
+    @Value("${spring.cloud.azure.servicebus.namespace}")
+    private String namespace;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    private ServiceBusProcessorClient processorClient;
+    private volatile boolean running = false;
+
+    @Override
+    public void start() {
+        processorClient = new ServiceBusClientBuilder()
+                .fullyQualifiedNamespace(namespace + ".servicebus.windows.net")
+                .credential(new DefaultAzureCredentialBuilder().build())
+                .processor()
+                .queueName(IMAGE_PROCESSING_QUEUE)
+                .processMessage(context -> {
+                    try {
+                        ImageProcessingMessage message = objectMapper.readValue(
+                                context.getMessage().getBody().toString(),
+                                ImageProcessingMessage.class);
+                        processImage(message, context);
+                    } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+                        log.error("Failed to deserialize Service Bus message", e);
+                        context.deadLetter();
+                    }
+                })
+                .processError(context -> log.error("Service Bus processing error", context.getException()))
+                .buildProcessorClient();
+        processorClient.start();
+        running = true;
+    }
+
+    @Override
+    public void stop() {
+        if (processorClient != null) {
+            processorClient.close();
+        }
+        running = false;
+    }
+
+    @Override
+    public boolean isRunning() {
+        return running;
+    }
+
+    void processImage(final ImageProcessingMessage message, ServiceBusReceivedMessageContext context) {
         boolean processingSuccess = false;
         Path tempDir = null;
         Path originalFile = null;
@@ -79,17 +126,16 @@ public abstract class AbstractFileProcessingService implements FileProcessor {
                 }
 
                 if (processingSuccess) {
-                    // Acknowledge the message if processing was successful
-                    channel.basicAck(deliveryTag, false);
+                    // Acknowledge the message
+                    context.complete();
                     log.debug("Message acknowledged for: {}", message.getKey());
                 } else {
-                    // Reject the message with requeue=false to trigger dead letter exchange
-                    // This will route the message to the retry queue with delay
-                    channel.basicNack(deliveryTag, false, false);
-                    log.debug("Message rejected and sent to dead letter exchange for delayed retry: {}", message.getKey());
+                    // Send to dead letter (no retry) for failed processing
+                    context.deadLetter();
+                    log.debug("Message sent to dead letter for: {}", message.getKey());
                 }
-            } catch (IOException e) {
-                log.error("Error handling RabbitMQ acknowledgment for: {}", message.getKey(), e);
+            } catch (Exception e) {
+                log.error("Error handling Service Bus acknowledgment for: {}", message.getKey(), e);
             }
         }
     }

@@ -11,7 +11,9 @@ import com.microsoft.migration.assets.model.ImageProcessingMessage;
 import com.microsoft.migration.assets.model.S3StorageItem;
 import com.microsoft.migration.assets.repository.ImageMetadataRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import com.azure.messaging.servicebus.ServiceBusMessage;
+import com.azure.messaging.servicebus.ServiceBusSenderClient;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
@@ -25,7 +27,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
-import static com.microsoft.migration.assets.config.RabbitConfig.IMAGE_PROCESSING_QUEUE;
+import static com.microsoft.migration.assets.config.ServiceBusConfig.IMAGE_PROCESSING_QUEUE;
 
 @Service
 @RequiredArgsConstructor
@@ -33,8 +35,9 @@ import static com.microsoft.migration.assets.config.RabbitConfig.IMAGE_PROCESSIN
 public class AwsS3Service implements StorageService {
 
     private final BlobServiceClient blobServiceClient;
-    private final RabbitTemplate rabbitTemplate;
+    private final ServiceBusSenderClient senderClient;
     private final ImageMetadataRepository imageMetadataRepository;
+    private final ObjectMapper objectMapper;
 
     @Value("${azure.storage.container-name}")
     private String containerName;
@@ -87,7 +90,7 @@ public class AwsS3Service implements StorageService {
             getStorageType(),
             file.getSize()
         );
-        rabbitTemplate.convertAndSend(IMAGE_PROCESSING_QUEUE, message);
+        senderClient.sendMessage(new ServiceBusMessage(objectMapper.writeValueAsString(message)));
 
         // Create and save metadata to database
         ImageMetadata metadata = new ImageMetadata();

@@ -1,13 +1,14 @@
 package com.microsoft.migration.assets.service;
 
-import com.microsoft.migration.assets.model.ImageProcessingMessage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import com.azure.messaging.servicebus.ServiceBusMessage;
+import com.azure.messaging.servicebus.ServiceBusSenderClient;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.multipart.MultipartFile;
@@ -17,12 +18,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Base64;
 
-import static com.microsoft.migration.assets.config.RabbitConfig.IMAGE_PROCESSING_QUEUE;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
@@ -33,7 +32,7 @@ class LocalFileStorageServiceTest {
     );
 
     @Mock
-    private RabbitTemplate rabbitTemplate;
+    private ServiceBusSenderClient senderClient;
 
     @Mock
     private MultipartFile multipartFile;
@@ -45,7 +44,7 @@ class LocalFileStorageServiceTest {
 
     @BeforeEach
     void setUp() throws IOException {
-        service = new LocalFileStorageService(rabbitTemplate);
+        service = new LocalFileStorageService(senderClient, new ObjectMapper());
         ReflectionTestUtils.setField(service, "storageDirectory", tempDir.toString());
         service.init();
     }
@@ -155,30 +154,30 @@ class LocalFileStorageServiceTest {
         service.uploadObject(file);
 
         assertTrue(Files.exists(tempDir.resolve("photo.PNG")));
-        verify(rabbitTemplate).convertAndSend(eq(IMAGE_PROCESSING_QUEUE), any(ImageProcessingMessage.class));
+        verify(senderClient).sendMessage(any(ServiceBusMessage.class));
     }
 
     @Test
     void listObjectsRequiresInitialization() {
-        LocalFileStorageService uninitializedService = new LocalFileStorageService(rabbitTemplate);
+        LocalFileStorageService uninitializedService = new LocalFileStorageService(senderClient, new ObjectMapper());
         assertThrows(IllegalStateException.class, uninitializedService::listObjects);
     }
 
     @Test
     void uploadObjectRequiresInitialization() {
-        LocalFileStorageService uninitializedService = new LocalFileStorageService(rabbitTemplate);
+        LocalFileStorageService uninitializedService = new LocalFileStorageService(senderClient, new ObjectMapper());
         assertThrows(IllegalStateException.class, () -> uninitializedService.uploadObject(multipartFile));
     }
 
     @Test
     void getObjectRequiresInitialization() {
-        LocalFileStorageService uninitializedService = new LocalFileStorageService(rabbitTemplate);
+        LocalFileStorageService uninitializedService = new LocalFileStorageService(senderClient, new ObjectMapper());
         assertThrows(IllegalStateException.class, () -> uninitializedService.getObject("image.png"));
     }
 
     @Test
     void deleteObjectRequiresInitialization() {
-        LocalFileStorageService uninitializedService = new LocalFileStorageService(rabbitTemplate);
+        LocalFileStorageService uninitializedService = new LocalFileStorageService(senderClient, new ObjectMapper());
         assertThrows(IllegalStateException.class, () -> uninitializedService.deleteObject("image.png"));
     }
 }

@@ -4,7 +4,9 @@ import com.microsoft.migration.assets.model.ImageProcessingMessage;
 import com.microsoft.migration.assets.model.S3StorageItem;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import com.azure.messaging.servicebus.ServiceBusMessage;
+import com.azure.messaging.servicebus.ServiceBusSenderClient;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
@@ -26,7 +28,7 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import static com.microsoft.migration.assets.config.RabbitConfig.IMAGE_PROCESSING_QUEUE;
+import static com.microsoft.migration.assets.config.ServiceBusConfig.IMAGE_PROCESSING_QUEUE;
 
 @Service
 @Profile("dev") // Only active when dev profile is active
@@ -38,15 +40,17 @@ public class LocalFileStorageService implements StorageService {
     private static final Set<String> ALLOWED_MIME = Collections.unmodifiableSet(
             new HashSet<>(Arrays.asList("image/jpeg", "image/png", "image/gif", "image/webp")));
 
-    private final RabbitTemplate rabbitTemplate;
+    private final ServiceBusSenderClient senderClient;
+    private final ObjectMapper objectMapper;
 
     @Value("${local.storage.directory:../storage}")
     private String storageDirectory;
 
     private Path rootLocation;
 
-    public LocalFileStorageService(RabbitTemplate rabbitTemplate) {
-        this.rabbitTemplate = rabbitTemplate;
+    public LocalFileStorageService(ServiceBusSenderClient senderClient, ObjectMapper objectMapper) {
+        this.senderClient = senderClient;
+        this.objectMapper = objectMapper;
     }
 
     @PostConstruct
@@ -132,7 +136,7 @@ public class LocalFileStorageService implements StorageService {
             getStorageType(),
             file.getSize()
         );
-        rabbitTemplate.convertAndSend(IMAGE_PROCESSING_QUEUE, message);
+        senderClient.sendMessage(new ServiceBusMessage(objectMapper.writeValueAsString(message)));
     }
 
     private Path resolveSafe(String key) throws IOException {
