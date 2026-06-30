@@ -17,6 +17,8 @@ import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import static com.microsoft.migration.assets.config.RabbitConfig.IMAGE_PROCESSING_QUEUE;
@@ -26,6 +28,8 @@ import static com.microsoft.migration.assets.config.RabbitConfig.IMAGE_PROCESSIN
 public class LocalFileStorageService implements StorageService {
 
     private static final Logger logger = LoggerFactory.getLogger(LocalFileStorageService.class);
+    private static final Set<String> ALLOWED_EXT = Set.of("jpg", "jpeg", "png", "gif", "webp");
+    private static final Set<String> ALLOWED_MIME = Set.of("image/jpeg", "image/png", "image/gif", "image/webp");
     
     private final RabbitTemplate rabbitTemplate;
     
@@ -90,6 +94,13 @@ public class LocalFileStorageService implements StorageService {
         if (filename.contains("..")) {
             throw new IOException("Cannot store file with relative path outside current directory");
         }
+
+        String ext = getExtension(filename).replaceFirst("^\\.", "").toLowerCase(Locale.ROOT);
+        String contentType = file.getContentType();
+        if (!ALLOWED_EXT.contains(ext) ||
+            contentType == null || !ALLOWED_MIME.contains(contentType.toLowerCase(Locale.ROOT))) {
+            throw new IOException("Unsupported file type: " + filename + " (" + contentType + ")");
+        }
         
         Path targetLocation = rootLocation.resolve(filename);
         Files.copy(file.getInputStream(), targetLocation, StandardCopyOption.REPLACE_EXISTING);
@@ -140,5 +151,13 @@ public class LocalFileStorageService implements StorageService {
     @Override
     public String getStorageType() {
         return "local";
+    }
+
+    private String getExtension(String filename) {
+        int lastDot = filename.lastIndexOf('.');
+        if (lastDot < 0 || lastDot == filename.length() - 1) {
+            return "";
+        }
+        return filename.substring(lastDot + 1);
     }
 }
