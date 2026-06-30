@@ -5,7 +5,7 @@ COPY --chown=1001:0 liberty_config/server-docker.xml /config/server.xml
 COPY --chown=1001:0 liberty_config/server-docker.env /config/server.env
 
 # Copy application
-COPY --chown=1001:0 dist/OpenLibertyApp.war /config/apps/
+COPY --chown=1001:0 target/OpenLibertyApp.war /config/apps/
 
 # Create directories for libraries
 RUN mkdir -p /opt/ol/wlp/usr/shared/resources/mysql
