@@ -1,0 +1,273 @@
+{
+  "$schema": "../../../../.vscode/extensions/vscjava.migrate-java-to-azure-1.21.0-darwin-arm64/skills/create-modernization-plan/tasks-schema.json",
+  "description": "Tasks template for modernization plan. Generate this file alongside plan.md to track individual migration tasks.",
+  "tasks": [
+    {
+      "type": "upgrade",
+      "id": "001-upgrade-java-version",
+      "description": "Upgrade Java Version. Addresses issues: Java Version is not the latest LTS.",
+      "reason": "The project runs on JDK 8, which is not the latest LTS. Upgrading to the latest LTS provides newer language features, performance improvements, security fixes, and a longer support lifecycle. Subsequent transform tasks depend on the upgraded runtime.",
+      "requirements": "Upgrade the Java runtime to the latest LTS (Java 25) across the affected modules (asset-manager, mi-sql-public-demo, rabbitmq-sender, todo-web-api-use-oracle-db). Perform only a JDK/Java version upgrade; do not upgrade Spring Boot, Spring Framework, or Jakarta EE unless required for compatibility. Update build configuration (pom.xml source/target/release) accordingly.",
+      "kbId": "java-version-upgrade",
+      "successCriteria": {
+        "passBuild": "true",
+        "generateNewUnitTests": "false",
+        "passUnitTests": "true"
+      }
+    },
+    {
+      "type": "transform",
+      "id": "002-transform-migration-ant-project-to-maven-project",
+      "description": "Migrate from Ant Project to Maven Project. Addresses issues: Ant build tool found.",
+      "reason": "The jakarta-ee/student-web-app module uses Ant, which lacks standard conventions and dependency management and is less suitable for modern cloud-native CI/CD. Migrating to Maven enables convention-over-configuration builds, robust dependency management, and better tooling integration.",
+      "requirements": "Migrate jakarta-ee/student-web-app/build.xml to a Maven pom.xml, restructure the source directories to the Maven standard layout, and ensure all existing dependencies and build outputs are preserved.",
+      "kbId": "ant-project-to-maven-project",
+      "dependencies": ["001-upgrade-java-version"],
+      "skills": [
+        {
+          "name": "migration-ant-project-to-maven-project",
+          "location": "builtin"
+        }
+      ],
+      "successCriteria": {
+        "passBuild": "true",
+        "generateNewUnitTests": "false",
+        "passUnitTests": "true"
+      }
+    },
+    {
+      "type": "transform",
+      "id": "003-transform-migrate-local-resource-to-azure",
+      "description": "Migrate the Local Resource to Azure. Addresses issues: Local JDBC Calls, Localhost Usage.",
+      "reason": "Several modules reference localhost resources (local JDBC datasources and localhost endpoints) that are not reachable when running in Azure. Migrating these local resources to managed Azure services is required for cloud readiness.",
+      "requirements": "Replace localhost/local JDBC datasource references with Azure-hosted resources across the affected files: asset-manager/worker/src/main/resources/application.properties, asset-manager/web/src/main/resources/application.properties, todo-web-api-use-oracle-db/src/main/resources/application.yaml, jakarta-ee/student-web-app/docker-compose.yml, and jakarta-ee/student-web-app/liberty_config/server-docker.xml. Externalize endpoints/connection settings via configuration so the application targets Azure managed services instead of localhost. Prefer managed identity authentication where applicable.",
+      "dependencies": ["002-transform-migration-ant-project-to-maven-project"],
+      "successCriteria": {
+        "passBuild": "true",
+        "generateNewUnitTests": "false",
+        "passUnitTests": "true"
+      }
+    },
+    {
+      "type": "security",
+      "id": "004-security-cwe-477-obsolete-function",
+      "description": "Scan and resolve CWE-477 (Use of Obsolete Function) vulnerabilities for this project.",
+      "reason": "Obsolete/deprecated APIs (iBATIS 2.x, Log4j 1.x, Codehaus Jackson, javax.annotation.PostConstruct) indicate unmaintained code paths and should be modernized to supported equivalents.",
+      "requirements": "Scan the project for CWE-477 and remediate obsolete/deprecated API usage. Known evidence: jakarta-ee/student-web-app MyBatisUtil.java, StudentService.java, AddStudentServlet.java, StudentProfileListServlet.java; asset-manager/web LocalFileStorageService.java; asset-manager/worker LocalFileProcessingService.java. Replace deprecated APIs with current supported equivalents while preserving behavior. Verify the project builds and tests pass.",
+      "dependencies": ["003-transform-migrate-local-resource-to-azure"],
+      "successCriteria": {
+        "passBuild": "true",
+        "generateNewUnitTests": "false",
+        "passUnitTests": "true"
+      }
+    },
+    {
+      "type": "security",
+      "id": "005-security-cwe-665-improper-initialization",
+      "description": "Scan and resolve CWE-665 (Improper Initialization) vulnerabilities for this project.",
+      "reason": "Resources are conditionally or lazily initialized without null-safety guards, which can leave them in an unexpected state and cause NullPointerExceptions.",
+      "requirements": "Scan the project for CWE-665 and remediate improper initialization. Known evidence: asset-manager/worker AbstractFileProcessingService.java (ImageWriteParam/ImageWriter conditional init) and asset-manager/web LocalFileStorageService.java (rootLocation initialized only in @PostConstruct). Ensure resources are safely initialized and guarded before use. Verify the project builds and tests pass.",
+      "dependencies": ["004-security-cwe-477-obsolete-function"],
+      "successCriteria": {
+        "passBuild": "true",
+        "generateNewUnitTests": "false",
+        "passUnitTests": "true"
+      }
+    },
+    {
+      "type": "security",
+      "id": "006-security-cwe-681-incorrect-numeric-conversion",
+      "description": "Scan and resolve CWE-681 (Incorrect Conversion between Numeric Types) vulnerabilities for this project.",
+      "reason": "Double-to-int truncation without rounding can produce off-by-one dimensions and distorted results.",
+      "requirements": "Scan the project for CWE-681 and remediate incorrect numeric conversions. Known evidence: asset-manager/worker AbstractFileProcessingService.java (thumbnail dimension casts and progressive scaling integer division). Apply proper rounding/safe conversion while preserving intended behavior. Verify the project builds and tests pass.",
+      "dependencies": ["005-security-cwe-665-improper-initialization"],
+      "successCriteria": {
+        "passBuild": "true",
+        "generateNewUnitTests": "false",
+        "passUnitTests": "true"
+      }
+    },
+    {
+      "type": "security",
+      "id": "007-security-cwe-772-missing-resource-release",
+      "description": "Scan and resolve CWE-772 (Missing Release of Resource after Effective Lifetime) vulnerabilities for this project.",
+      "reason": "ImageWriter and ImageOutputStream objects are not released on exception paths, leaking resources for the process lifetime.",
+      "requirements": "Scan the project for CWE-772 and remediate missing resource releases. Known evidence: asset-manager/worker AbstractFileProcessingService.java (jpgWriter/pngWriter and ImageOutputStream not wrapped in try-with-resources/try-finally). Ensure all resources are released deterministically. Verify the project builds and tests pass.",
+      "dependencies": ["006-security-cwe-681-incorrect-numeric-conversion"],
+      "successCriteria": {
+        "passBuild": "true",
+        "generateNewUnitTests": "false",
+        "passUnitTests": "true"
+      }
+    },
+    {
+      "type": "security",
+      "id": "008-security-cwe-775-missing-fd-release",
+      "description": "Scan and resolve CWE-775 (Missing Release of File Descriptor or Handle after Effective Lifetime) vulnerabilities for this project.",
+      "reason": "File descriptors wrapped by ImageOutputStream can leak on exception paths, risking OS file-descriptor exhaustion under load.",
+      "requirements": "Scan the project for CWE-775 and remediate missing file descriptor/handle releases. Known evidence: asset-manager/worker AbstractFileProcessingService.java (ImageOutputStream over output file closed outside try-finally/try-with-resources). Guarantee descriptor cleanup on all paths. Verify the project builds and tests pass.",
+      "dependencies": ["007-security-cwe-772-missing-resource-release"],
+      "successCriteria": {
+        "passBuild": "true",
+        "generateNewUnitTests": "false",
+        "passUnitTests": "true"
+      }
+    },
+    {
+      "type": "security",
+      "id": "009-security-cwe-1057-data-access-outside-manager",
+      "description": "Scan and resolve CWE-1057 (Data Access Operations Outside of Expected Data Manager Component) vulnerabilities for this project.",
+      "reason": "Data-access logic performed outside the designated repository/DAO layer bypasses the central data manager and mixes concerns.",
+      "requirements": "Scan the project for CWE-1057 and remediate data-access operations performed outside the designated data manager. Known evidence: jakarta-ee/student-web-app StudentProfileListServlet.java and AddStudentServlet.java (direct SqlMapSession use); todo-web-api-use-oracle-db OracleSqlDemonstrator.java (raw JDBC) and TodoService.java (direct EntityManager native queries). Route data access through the proper repository/DAO layer. Verify the project builds and tests pass.",
+      "dependencies": ["008-security-cwe-775-missing-fd-release"],
+      "successCriteria": {
+        "passBuild": "true",
+        "generateNewUnitTests": "false",
+        "passUnitTests": "true"
+      }
+    },
+    {
+      "type": "security",
+      "id": "010-security-cwe-259-hardcoded-password",
+      "description": "Scan and resolve CWE-259 (Use of Hard-coded Password) vulnerabilities for this project.",
+      "reason": "Hard-coded passwords across configuration and source files are a credential-exposure risk.",
+      "requirements": "Scan the project for CWE-259 and remediate hard-coded passwords. Known evidence: todo-web-api-use-oracle-db/src/main/resources/application.yaml; asset-manager/worker and asset-manager/web application.properties; jakarta-ee/student-web-app/docker-compose.yml; Malshinon/DBConnection.cs. Externalize secrets to a secure store (environment variables / Azure Key Vault / managed identity) and remove literals. Verify the project builds and tests pass.",
+      "dependencies": ["009-security-cwe-1057-data-access-outside-manager"],
+      "successCriteria": {
+        "passBuild": "true",
+        "generateNewUnitTests": "false",
+        "passUnitTests": "true"
+      }
+    },
+    {
+      "type": "security",
+      "id": "011-security-cwe-778-insufficient-logging",
+      "description": "Scan and resolve CWE-778 (Insufficient Logging) vulnerabilities for this project.",
+      "reason": "Security-relevant failures are swallowed without logging, discarding important error context.",
+      "requirements": "Scan the project for CWE-778 and remediate insufficient logging. Known evidence: todo-web-api-use-oracle-db TodoController.java (updateTodo() and deleteTodo() catch exceptions and return 404 without logging). Add appropriate logging for security-relevant failures without leaking sensitive data. Verify the project builds and tests pass.",
+      "dependencies": ["010-security-cwe-259-hardcoded-password"],
+      "successCriteria": {
+        "passBuild": "true",
+        "generateNewUnitTests": "false",
+        "passUnitTests": "true"
+      }
+    },
+    {
+      "type": "security",
+      "id": "012-security-cwe-798-hardcoded-credentials",
+      "description": "Scan and resolve CWE-798 (Use of Hard-coded Credentials) vulnerabilities for this project.",
+      "reason": "Hard-coded credentials (usernames + passwords) throughout the workspace are a serious security risk.",
+      "requirements": "Scan the project for CWE-798 and remediate hard-coded credentials. Known evidence: Malshinon/DBConnection.cs; jakarta-ee/student-web-app/docker-compose.yml; asset-manager/worker and asset-manager/web application.properties; todo-web-api-use-oracle-db/src/main/resources/application.yaml. Move credentials to a secure store and adopt passwordless/managed identity where possible. Verify the project builds and tests pass.",
+      "dependencies": ["011-security-cwe-778-insufficient-logging"],
+      "successCriteria": {
+        "passBuild": "true",
+        "generateNewUnitTests": "false",
+        "passUnitTests": "true"
+      }
+    },
+    {
+      "type": "security",
+      "id": "013-security-cwe-22-path-traversal",
+      "description": "Scan and resolve CWE-22 (Improper Limitation of a Pathname to a Restricted Directory / Path Traversal) vulnerabilities for this project.",
+      "reason": "User-supplied keys are resolved against a root location without validation, enabling path traversal.",
+      "requirements": "Scan the project for CWE-22 and remediate path traversal. Known evidence: asset-manager/web LocalFileStorageService.java (getObject/deleteObject resolve user key) and S3Controller.java (@PathVariable key at /view/{key}, /delete/{key}). Validate and canonicalize resolved paths to ensure they remain within the restricted directory. Verify the project builds and tests pass.",
+      "dependencies": ["012-security-cwe-798-hardcoded-credentials"],
+      "successCriteria": {
+        "passBuild": "true",
+        "generateNewUnitTests": "false",
+        "passUnitTests": "true"
+      }
+    },
+    {
+      "type": "security",
+      "id": "014-security-cwe-23-relative-path-traversal",
+      "description": "Scan and resolve CWE-23 (Relative Path Traversal) vulnerabilities for this project.",
+      "reason": "User-controlled keys containing '../' sequences can escape the intended storage directory.",
+      "requirements": "Scan the project for CWE-23 and remediate relative path traversal. Known evidence: asset-manager/web LocalFileStorageService.java (getObject line ~109, deleteObject line ~118) and S3Controller.java (passes @PathVariable key directly). Neutralize relative path sequences before resolving paths. Verify the project builds and tests pass.",
+      "dependencies": ["013-security-cwe-22-path-traversal"],
+      "successCriteria": {
+        "passBuild": "true",
+        "generateNewUnitTests": "false",
+        "passUnitTests": "true"
+      }
+    },
+    {
+      "type": "security",
+      "id": "015-security-cwe-36-absolute-path-traversal",
+      "description": "Scan and resolve CWE-36 (Absolute Path Traversal) vulnerabilities for this project.",
+      "reason": "Path.resolve with an absolute user-supplied path discards the base directory, allowing arbitrary file access.",
+      "requirements": "Scan the project for CWE-36 and remediate absolute path traversal. Known evidence: asset-manager/web LocalFileStorageService.java (getObject/deleteObject) and S3Controller.java (viewObject). Reject or safely handle absolute paths so resolution stays within the restricted directory. Verify the project builds and tests pass.",
+      "dependencies": ["014-security-cwe-23-relative-path-traversal"],
+      "successCriteria": {
+        "passBuild": "true",
+        "generateNewUnitTests": "false",
+        "passUnitTests": "true"
+      }
+    },
+    {
+      "type": "security",
+      "id": "016-security-cwe-434-unrestricted-file-upload",
+      "description": "Scan and resolve CWE-434 (Unrestricted Upload of File with Dangerous Type) vulnerabilities for this project.",
+      "reason": "Uploads are accepted without file type/extension/MIME validation, allowing dangerous file types.",
+      "requirements": "Scan the project for CWE-434 and remediate unrestricted file uploads. Known evidence: asset-manager/web LocalFileStorageService.java (uploadObject line ~84) and S3Controller.java (POST /upload accepts any MultipartFile). Enforce allow-list validation of file type/extension/MIME and safe storage handling. Verify the project builds and tests pass.",
+      "dependencies": ["015-security-cwe-36-absolute-path-traversal"],
+      "successCriteria": {
+        "passBuild": "true",
+        "generateNewUnitTests": "false",
+        "passUnitTests": "true"
+      }
+    },
+    {
+      "type": "security",
+      "id": "017-security-cwe-79-xss",
+      "description": "Scan and resolve CWE-79 (Cross-site Scripting) vulnerabilities for this project.",
+      "reason": "Unescaped user-supplied data is concatenated into HTML output, creating stored/reflected XSS.",
+      "requirements": "Scan the project for CWE-79 and remediate cross-site scripting. Known evidence: jakarta-ee/student-web-app StudentProfileListServlet.java (doGet concatenates unescaped student name/email/major and reflects raw exception messages into HTML). Apply context-appropriate output encoding/escaping for all user-controlled output. Verify the project builds and tests pass.",
+      "dependencies": ["016-security-cwe-434-unrestricted-file-upload"],
+      "successCriteria": {
+        "passBuild": "true",
+        "generateNewUnitTests": "false",
+        "passUnitTests": "true"
+      }
+    },
+    {
+      "type": "security",
+      "id": "018-security-cwe-99-resource-injection",
+      "description": "Scan and resolve CWE-99 (Improper Control of Resource Identifiers / Resource Injection) vulnerabilities for this project.",
+      "reason": "User-controlled identifiers are used to access resources without restriction, allowing resource injection.",
+      "requirements": "Scan the project for CWE-99 and remediate resource injection. Known evidence: asset-manager/web S3Controller.java (viewObject/deleteObject pass @PathVariable key) and LocalFileStorageService.java (getObject/deleteObject resolve key without sanitization). Restrict and validate resource identifiers before use. Verify the project builds and tests pass.",
+      "dependencies": ["017-security-cwe-79-xss"],
+      "successCriteria": {
+        "passBuild": "true",
+        "generateNewUnitTests": "false",
+        "passUnitTests": "true"
+      }
+    },
+    {
+      "type": "security",
+      "id": "019-security-scan-and-fix-cve",
+      "description": "Scan and fix CVE vulnerabilities for this project.",
+      "reason": "The assessment found multiple known CVEs (Spring Boot DevTools timing attack, pgjdbc SCRAM DoS, jackson-databind PTV bypasses/SSRF, and others) in declared dependencies that must be remediated before deployment.",
+      "requirements": "Scan all project dependencies for known CVEs and remediate identified vulnerabilities by upgrading to the minimum patched versions. Known evidence includes: spring-boot-devtools (asset-manager/web/pom.xml, todo-web-api-use-oracle-db/pom.xml), org.postgresql:postgresql 42.6.1 (asset-manager/web/pom.xml, asset-manager/worker/pom.xml), and com.fasterxml.jackson.core:jackson-databind (asset-manager/worker/pom.xml, rabbitmq-sender/pom.xml). If a fix requires a major version upgrade, document the dependency, current version, upgraded version, and breaking-change risk. Verify the project builds and all tests pass after remediation.",
+      "dependencies": ["018-security-cwe-99-resource-injection"],
+      "skills": [
+        {
+          "name": "validate-cves-and-fix",
+          "location": "builtin"
+        }
+      ],
+      "successCriteria": {
+        "passBuild": "true",
+        "generateNewUnitTests": "false",
+        "passUnitTests": "true"
+      }
+    }
+  ],
+  "metadata": {
+    "planName": "Lab2 Modernization Plan",
+    "projectName": "java-migration-copilot-samples-lab2",
+    "language": "java",
+    "createdAt": "2026-06-30T00:00:00.000Z",
+    "version": "1.0"
+  }
+}
