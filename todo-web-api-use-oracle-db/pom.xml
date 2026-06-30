@@ -71,6 +71,13 @@
             <optional>true</optional>
         </dependency>
 
+        <!-- Azure Key Vault — resolve ${DB_PASSWORD} and other secrets from vault at startup -->
+        <dependency>
+            <groupId>com.azure.spring</groupId>
+            <artifactId>spring-cloud-azure-starter-keyvault-secrets</artifactId>
+            <version>5.18.0</version>
+        </dependency>
+
         <!-- Test -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
