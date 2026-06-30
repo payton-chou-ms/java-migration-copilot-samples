@@ -152,7 +152,7 @@ public abstract class AbstractFileProcessingService implements FileProcessor {
             jpgWriter.dispose();
             outputStream.close();
         } else {
-            // For PNG, use compression level 0 (no compression) for best quality
+            // For PNG, configure explicit compression settings when the writer supports it
             if (extension.equalsIgnoreCase("png")) {
                 javax.imageio.ImageWriter pngWriter = ImageIO.getImageWritersByFormatName("png").next();
                 try {
@@ -160,7 +160,7 @@ public abstract class AbstractFileProcessingService implements FileProcessor {
                     if (pngWriteParam.canWriteCompressed()) {
                         pngWriteParam.setCompressionMode(javax.imageio.ImageWriteParam.MODE_EXPLICIT);
                         pngWriteParam.setCompressionType("Deflate");
-                        pngWriteParam.setCompressionQuality(0.0f); // 0 = best quality for PNG
+                        pngWriteParam.setCompressionQuality(0.0f); // Lower compression for PNG (tradeoff is size vs encode time)
 
                         javax.imageio.IIOImage outputImage = new javax.imageio.IIOImage(resultImage, null, null);
                         try (javax.imageio.stream.ImageOutputStream outputStream =

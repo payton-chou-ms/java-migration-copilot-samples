@@ -1,8 +1,10 @@
 package com.microsoft.migration.assets.worker.service;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Assumptions;
 
 import javax.imageio.ImageIO;
+import javax.imageio.ImageWriter;
 import java.awt.image.BufferedImage;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -21,6 +23,14 @@ class AbstractFileProcessingServiceTest {
         try {
             BufferedImage image = new BufferedImage(50, 50, BufferedImage.TYPE_INT_ARGB);
             ImageIO.write(image, "png", input.toFile());
+
+            ImageWriter pngWriter = ImageIO.getImageWritersByFormatName("png").next();
+            try {
+                Assumptions.assumeTrue(pngWriter.getDefaultWriteParam().canWriteCompressed(),
+                    "Test requires a PNG writer that supports explicit compression");
+            } finally {
+                pngWriter.dispose();
+            }
 
             service.generate(input, output);
 
