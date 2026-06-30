@@ -11,6 +11,8 @@
 
     <properties>
         <aws-sdk.version>2.25.13</aws-sdk.version>
+        <jackson-databind.version>2.18.8</jackson-databind.version>
+        <postgresql.version>42.7.11</postgresql.version>
     </properties>
 
     <artifactId>assets-manager-web</artifactId>
@@ -72,6 +74,16 @@
                 <groupId>software.amazon.awssdk</groupId>
                 <artifactId>s3</artifactId>
                 <version>${aws-sdk.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-databind</artifactId>
+                <version>${jackson-databind.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.postgresql</groupId>
+                <artifactId>postgresql</artifactId>
+                <version>${postgresql.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
