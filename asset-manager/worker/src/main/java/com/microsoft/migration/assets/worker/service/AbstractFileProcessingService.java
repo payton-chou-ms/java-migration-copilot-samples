@@ -149,14 +149,14 @@ public abstract class AbstractFileProcessingService implements FileProcessor {
             jpgWriteParam.setCompressionQuality(0.95f);
             writeWithWriter(jpgWriter, jpgWriteParam, new IIOImage(resultImage, null, null), output);
         } else {
-            // For PNG, use compression level 0 (no compression) for best quality
+            // For PNG, configure explicit compression settings when the writer supports it
             if (extension.equalsIgnoreCase("png")) {
                 ImageWriter pngWriter = ImageIO.getImageWritersByFormatName("png").next();
                 ImageWriteParam pngWriteParam = pngWriter.getDefaultWriteParam();
                 if (pngWriteParam.canWriteCompressed()) {
                     pngWriteParam.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
                     pngWriteParam.setCompressionType("Deflate");
-                    pngWriteParam.setCompressionQuality(0.0f); // 0 = best quality for PNG
+                    pngWriteParam.setCompressionQuality(0.0f); // Lower compression for PNG (tradeoff is size vs encode time)
                     writeWithWriter(pngWriter, pngWriteParam, new IIOImage(resultImage, null, null), output);
                 } else {
                     pngWriter.dispose();

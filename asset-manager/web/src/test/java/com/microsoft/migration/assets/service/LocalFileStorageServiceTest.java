@@ -10,6 +10,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -33,6 +34,9 @@ class LocalFileStorageServiceTest {
 
     @Mock
     private RabbitTemplate rabbitTemplate;
+
+    @Mock
+    private MultipartFile multipartFile;
 
     @TempDir
     Path tempDir;
@@ -152,5 +156,29 @@ class LocalFileStorageServiceTest {
 
         assertTrue(Files.exists(tempDir.resolve("photo.PNG")));
         verify(rabbitTemplate).convertAndSend(eq(IMAGE_PROCESSING_QUEUE), any(ImageProcessingMessage.class));
+    }
+
+    @Test
+    void listObjectsRequiresInitialization() {
+        LocalFileStorageService uninitializedService = new LocalFileStorageService(rabbitTemplate);
+        assertThrows(IllegalStateException.class, uninitializedService::listObjects);
+    }
+
+    @Test
+    void uploadObjectRequiresInitialization() {
+        LocalFileStorageService uninitializedService = new LocalFileStorageService(rabbitTemplate);
+        assertThrows(IllegalStateException.class, () -> uninitializedService.uploadObject(multipartFile));
+    }
+
+    @Test
+    void getObjectRequiresInitialization() {
+        LocalFileStorageService uninitializedService = new LocalFileStorageService(rabbitTemplate);
+        assertThrows(IllegalStateException.class, () -> uninitializedService.getObject("image.png"));
+    }
+
+    @Test
+    void deleteObjectRequiresInitialization() {
+        LocalFileStorageService uninitializedService = new LocalFileStorageService(rabbitTemplate);
+        assertThrows(IllegalStateException.class, () -> uninitializedService.deleteObject("image.png"));
     }
 }

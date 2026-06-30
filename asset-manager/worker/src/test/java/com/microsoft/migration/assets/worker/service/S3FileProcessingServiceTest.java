@@ -10,13 +10,16 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 import software.amazon.awssdk.core.ResponseInputStream;
 import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.http.AbortableInputStream;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
+import java.io.ByteArrayInputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -57,8 +60,9 @@ public class S3FileProcessingServiceTest {
     void downloadOriginalCopiesFileFromS3() throws Exception {
         // Arrange
         Path tempFile = Files.createTempFile("download-", ".tmp");
-        @SuppressWarnings("unchecked")
-        ResponseInputStream<GetObjectResponse> mockResponse = mock(ResponseInputStream.class);
+        ResponseInputStream<GetObjectResponse> mockResponse = new ResponseInputStream<>(
+                GetObjectResponse.builder().build(),
+                AbortableInputStream.create(new ByteArrayInputStream("content".getBytes(StandardCharsets.UTF_8))));
 
         when(s3Client.getObject(any(GetObjectRequest.class))).thenReturn(mockResponse);
 
