@@ -7,7 +7,6 @@
         <feature>jaxws-2.2</feature>
         <feature>jdbc-4.3</feature>
         <feature>jndi-1.0</feature>
-        <feature>javaMail-1.6</feature>
         <feature>appSecurity-3.0</feature>
         <feature>springBoot-2.0</feature>
         <feature>webProfile-8.0</feature>
@@ -17,14 +16,6 @@
 
     <!-- Enable logging -->
     <logging maxFileSize="100" maxFiles="10" traceSpecification=""/>
-
-    <!-- Mail Session for JavaMail -->
-    <mailSession id="StudentMailSession" jndiName="mail/StudentMailSession" description="Mail session for sending emails"
-        host="${env.MAIL_HOST:localhost}"
-        from="noreply@example.com"
-        port="25"
-        transportProtocol="smtp"
-        mailSessionID="SendGridMailSession" password="changeit" user="user"/>
 
     <applicationMonitor updateTrigger="mbean"/>
 

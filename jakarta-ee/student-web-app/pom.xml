@@ -24,7 +24,6 @@
     <jackson.version>2.17.2</jackson.version>
     <spring.version>5.3.39</spring.version>
     <servlet.api.version>4.0.1</servlet.api.version>
-    <javax.mail.version>1.6.2</javax.mail.version>
     <mysql.connector.version>8.0.33</mysql.connector.version>
   </properties>
 
@@ -77,12 +76,18 @@
       <scope>provided</scope>
     </dependency>
 
-    <!-- JavaMail API (provided by server) -->
+    <!-- Azure Communication Services Email -->
     <dependency>
-      <groupId>com.sun.mail</groupId>
-      <artifactId>javax.mail</artifactId>
-      <version>${javax.mail.version}</version>
-      <scope>provided</scope>
+      <groupId>com.azure</groupId>
+      <artifactId>azure-communication-email</artifactId>
+      <version>1.0.18</version>
+    </dependency>
+
+    <!-- Azure Identity for DefaultAzureCredential -->
+    <dependency>
+      <groupId>com.azure</groupId>
+      <artifactId>azure-identity</artifactId>
+      <version>1.13.3</version>
     </dependency>
 
     <!-- MySQL Connector (provided by server JNDI) -->

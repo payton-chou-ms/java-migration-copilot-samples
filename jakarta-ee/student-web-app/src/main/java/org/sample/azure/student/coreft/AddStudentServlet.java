@@ -7,17 +7,15 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
-import javax.naming.Context;
-import javax.naming.InitialContext;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import javax.mail.Message;
-import javax.mail.Session;
-import javax.mail.Transport;
-import javax.mail.internet.InternetAddress;
-import javax.mail.internet.MimeMessage;
+import com.azure.communication.email.EmailClient;
+import com.azure.communication.email.EmailClientBuilder;
+import com.azure.communication.email.models.EmailAddress;
+import com.azure.communication.email.models.EmailMessage;
+import com.azure.identity.DefaultAzureCredentialBuilder;
 
 public class AddStudentServlet extends HttpServlet {
 
@@ -83,14 +81,17 @@ public class AddStudentServlet extends HttpServlet {
 
     private void sendEmail(String to, String name) throws Exception {
         logger.info("Preparing to send email to: {}", to);
-        // Lookup mail session from JNDI (configured in server.xml)
-        Context ctx = new InitialContext();
-        Session session = (Session) ctx.lookup("java:comp/env/mail/StudentMailSession");
-        Message msg = new MimeMessage(session);
-        msg.setRecipients(Message.RecipientType.TO, InternetAddress.parse(to, false));
-        msg.setSubject("Welcome, " + name + "!");
-        msg.setText("Dear " + name + ",\n\nYour student profile has been created successfully.\n\nRegards,\nAdmin");
-        Transport.send(msg);
+        EmailClient emailClient = new EmailClientBuilder()
+                .endpoint(System.getenv("ACS_EMAIL_ENDPOINT"))
+                .credential(new DefaultAzureCredentialBuilder().build())
+                .buildClient();
+        String senderAddress = System.getenv("ACS_SENDER_ADDRESS");
+        EmailMessage emailMessage = new EmailMessage()
+                .setSenderAddress(senderAddress)
+                .setToRecipients(new EmailAddress(to))
+                .setSubject("Welcome, " + name + "!")
+                .setBodyPlainText("Dear " + name + ",\n\nYour student profile has been created successfully.\n\nRegards,\nAdmin");
+        emailClient.beginSend(emailMessage).waitForCompletion();
         logger.info("Email sent to: {}", to);
     }
 }
