@@ -50,7 +50,7 @@ public class TodoController {
             TodoItem updatedTodo = todoService.updateTodo(id, todoDetails);
             return ResponseEntity.ok(updatedTodo);
         } catch (RuntimeException ex) {
-            logger.warn("Failed to update todo id={}: {}", id, ex.getMessage());
+            logger.warn("Failed to update todo id={}", id, ex);
             return ResponseEntity.notFound().build();
         }
     }
@@ -61,7 +61,7 @@ public class TodoController {
             todoService.deleteTodo(id);
             return ResponseEntity.noContent().build();
         } catch (Exception ex) {
-            logger.warn("Failed to delete todo id={}: {}", id, ex.getMessage());
+            logger.warn("Failed to delete todo id={}", id, ex);
             return ResponseEntity.notFound().build();
         }
     }
