@@ -107,7 +107,7 @@ public class LocalFileStorageService implements StorageService {
 
     @Override
     public InputStream getObject(String key) throws IOException {
-        Path file = rootLocation.resolve(key);
+        Path file = resolveSafe(key);
         if (!Files.exists(file)) {
             throw new FileNotFoundException("File not found: " + key);
         }
@@ -117,7 +117,7 @@ public class LocalFileStorageService implements StorageService {
     @Override
     public void deleteObject(String key) throws IOException {
         // Delete both original and thumbnail if it exists
-        Path file = rootLocation.resolve(key);
+        Path file = resolveSafe(key);
         if (!Files.exists(file)) {
             throw new FileNotFoundException("File not found: " + key);
         }
@@ -126,7 +126,7 @@ public class LocalFileStorageService implements StorageService {
 
         // Try to delete thumbnail if it exists
         try {
-            Path thumbnailFile = rootLocation.resolve(getThumbnailKey(key));
+            Path thumbnailFile = resolveSafe(getThumbnailKey(key));
             if (Files.exists(thumbnailFile)) {
                 Files.delete(thumbnailFile);
                 logger.info("Deleted thumbnail file: {}", thumbnailFile);
@@ -140,5 +140,16 @@ public class LocalFileStorageService implements StorageService {
     @Override
     public String getStorageType() {
         return "local";
+    }
+
+    private Path resolveSafe(String key) throws IOException {
+        if (key == null || key.isBlank()) {
+            throw new IOException("Invalid or unsafe key: " + key);
+        }
+        Path resolved = rootLocation.resolve(key).normalize();
+        if (!resolved.startsWith(rootLocation.normalize())) {
+            throw new IOException("Path traversal attempt detected: " + key);
+        }
+        return resolved;
     }
 }
