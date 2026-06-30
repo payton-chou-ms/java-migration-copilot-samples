@@ -14,6 +14,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Base64;
 
 import static com.microsoft.migration.assets.config.RabbitConfig.IMAGE_PROCESSING_QUEUE;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -70,11 +71,15 @@ class LocalFileStorageServiceTest {
 
     @Test
     void uploadObjectAllowsSupportedImageType() throws IOException {
+        // Minimal valid 1x1 white-pixel PNG
+        byte[] pngBytes = Base64.getDecoder().decode(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+        );
         MockMultipartFile file = new MockMultipartFile(
             "file",
             "photo.PNG",
             "image/png",
-            "img".getBytes()
+            pngBytes
         );
 
         service.uploadObject(file);
