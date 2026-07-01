@@ -22,7 +22,7 @@
     <slf4j.version>2.0.16</slf4j.version>
     <logback.version>1.5.12</logback.version>
     <jackson.version>2.17.2</jackson.version>
-    <spring.version>5.3.39</spring.version>
+    <spring.version>6.2.18</spring.version>
     <servlet.api.version>4.0.1</servlet.api.version>
     <javax.mail.version>1.6.2</javax.mail.version>
     <mysql.connector.version>8.0.33</mysql.connector.version>
